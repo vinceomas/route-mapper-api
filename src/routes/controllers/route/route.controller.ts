@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { AddRouteDto } from 'src/routes/entities/route/add-route.dto';
 import { EditRouteDto } from 'src/routes/entities/route/edit-route.dto';
 import { RouteDto } from 'src/routes/entities/route/route.dto';
@@ -11,7 +13,9 @@ export class RouteController {
         private routeService: RouteService,
         private taskService: TaskService
     ){}
-
+    
+    @ApiBearerAuth()
+    @UseGuards(AuthGuard('jwt'))
     @Get()
     public findAll(): Promise<RouteDto[]>{
         return this.routeService.findAll();

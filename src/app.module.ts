@@ -6,6 +6,7 @@ import * as path from 'path';
 import { ScheduleModule } from '@nestjs/schedule';
 import { RoutesModule } from './routes/routes.module';
 import { ConfigModule } from '@nestjs/config';
+import { AuthzModule } from './authz/authz.module';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { ConfigModule } from '@nestjs/config';
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true
-    })
+    }),
+    AuthzModule
   ],
   controllers: [AppController],
   providers: [AppService],

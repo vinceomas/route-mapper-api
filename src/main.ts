@@ -13,8 +13,12 @@ async function bootstrap() {
   .setDescription('Route Mapper API')
   .setVersion('1.0')
   .addTag('routeMapper')
+  .addBearerAuth()
   .build();
   const document = SwaggerModule.createDocument(app, config);
+
+  const options = new DocumentBuilder().addBearerAuth();
+
   SwaggerModule.setup('api', app, document);
 
   await app.listen(3000);
