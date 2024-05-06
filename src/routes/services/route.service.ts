@@ -12,6 +12,7 @@ import { map } from "rxjs";
 import { AxiosRequestConfig } from "axios";
 import { Client } from "@googlemaps/google-maps-services-js";
 import { AlternativeRouteService } from "./alternative-route.service";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class RouteService {
@@ -19,7 +20,8 @@ export class RouteService {
         @InjectRepository(Route) private readonly routeRepository: Repository<Route>,
         private readonly routeMapper: RouteMapperService,
         private readonly httpService: HttpService,
-        private readonly alternativeRoutesService: AlternativeRouteService
+        private readonly alternativeRoutesService: AlternativeRouteService,
+        private configService: ConfigService
     ){}
 
     public async findAll(): Promise<RouteDto[]>{
@@ -89,7 +91,7 @@ export class RouteService {
                 lng: Number(route.destinationLongitude)         
             },
             alternatives: true,
-            key: 'AIzaSyCa2jbjuPvveaNLvXeOVf0uEPkCw2rb8Lo',
+            key: this.configService.get<string>('GOOGLE_MAPS_API_KEY'),
             },
             timeout: 3000, // milliseconds
         })

@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import * as path from 'path';
 import { ScheduleModule } from '@nestjs/schedule';
 import { RoutesModule } from './routes/routes.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -15,7 +16,10 @@ import { RoutesModule } from './routes/routes.module';
       database: path.resolve(__dirname, '..', 'db.sqlite')
     }),
     RoutesModule,
-    ScheduleModule.forRoot()
+    ScheduleModule.forRoot(),
+    ConfigModule.forRoot({
+      isGlobal: true
+    })
   ],
   controllers: [AppController],
   providers: [AppService],
