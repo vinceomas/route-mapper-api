@@ -1,16 +1,15 @@
-import { RouteDto } from "../route/route.dto";
+import { AddRouteDto } from "../route/add-route.dto";
 
-export class AlternativeRouteDto {
-    public readonly id: number;
+export class AddRouteDetailDto {
     public readonly routeId: number;
-    public readonly jobId: string;
+    public readonly jobId: number;
     public readonly date: Date;
     public readonly distanceText: string;
     public readonly distanceValue: number;
     public readonly durationText: string;
     public readonly durationValue: number;
 
-    public constructor(opts?: AlternativeRouteDto){
+    public constructor(opts?: AddRouteDto){
         Object.assign(this, opts)
     }
 }

@@ -35,7 +35,7 @@ export class TaskService {
         }else{
             const jobUuid: string = uuid();
             const job = new CronJob(cronExpression, () => {
-                this.routeService.getAllRouteAlternativesInformation(jobUuid);
+                this.routeService.getAllRouteDetails(jobUuid);
                 console.warn(`time (${cronExpression}) for job ${name} to run!`);
             });
         

@@ -11,7 +11,7 @@ import { HttpService } from "@nestjs/axios";
 import { map } from "rxjs";
 import { AxiosRequestConfig } from "axios";
 import { Client } from "@googlemaps/google-maps-services-js";
-import { AlternativeRouteService } from "./alternative-route.service";
+import { RouteDetailService } from "./route-detail.service";
 import { ConfigService } from "@nestjs/config";
 
 @Injectable()
@@ -20,7 +20,7 @@ export class RouteService {
         @InjectRepository(Route) private readonly routeRepository: Repository<Route>,
         private readonly routeMapper: RouteMapperService,
         private readonly httpService: HttpService,
-        private readonly alternativeRoutesService: AlternativeRouteService,
+        private readonly routeDetailService: RouteDetailService,
         private configService: ConfigService
     ){}
 
@@ -68,7 +68,7 @@ export class RouteService {
         return route;
     }
 
-    public async getAlternativeRouteInfo(route: Route, jobId: string){
+    public async getRouteDetail(route: Route, jobId: string){
         const client = new Client({});
 
         console.log('RETRIEVE INFORMATION FOR ROUTE: ', {
@@ -97,15 +97,15 @@ export class RouteService {
         })
         .then((r) => {
             console.log('MIO TEST', r.data);
-            r.data.routes.forEach(alternativeRoute => {
-                this.alternativeRoutesService.add({
+            r.data.routes.forEach(routeDetail => {
+                this.routeDetailService.add({
                     routeId: route.id,
                     jobId: jobId,
                     date: new Date(),
-                    distanceText: alternativeRoute.legs[0].distance.text,
-                    distanceValue: alternativeRoute.legs[0].distance.value,
-                    durationText: alternativeRoute.legs[0].duration.text,
-                    durationValue: alternativeRoute.legs[0].duration.value
+                    distanceText: routeDetail.legs[0].distance.text,
+                    distanceValue: routeDetail.legs[0].distance.value,
+                    durationText: routeDetail.legs[0].duration.text,
+                    durationValue: routeDetail.legs[0].duration.value
                 })
             })
         })
@@ -114,9 +114,9 @@ export class RouteService {
         });
     }
 
-    public async getAllRouteAlternativesInformation(jobId: string){
+    public async getAllRouteDetails(jobId: string){
         this.findAll().then(routes => {
-            routes.forEach(route => {this.getAlternativeRouteInfo(route, jobId)})
+            routes.forEach(route => {this.getRouteDetail(route, jobId)})
         })
     }
 
