@@ -3,26 +3,15 @@ import { Cron, CronExpression, SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import { RouteService } from "./route.service";
 import { v4 as uuid } from 'uuid';
+import { MailService } from "./mail.service";
 
 @Injectable()
 export class CronService {
     constructor(
         private schedulerRegistry: SchedulerRegistry,
         private routeService: RouteService,
-    ) {
-
-    }
-    //QUESTIO JOB VIENE AVVIATO DIRETTAMENTE ALL'AVVIO DEL SERVER 
-    //   @Cron(CronExpression.EVERY_8_HOURS)
-    //   handleEvery8Hours() {
-    //     console.log('Task executed every 8 hours');
-    //   }
-
-    //QUESTO JOB VIENE AVVIATO DIRETTAMENTE ALL'AVIO DEL SERVER 
-    //   @Cron('45 * * * * *')
-    //   handleEvery45Seconds() {
-    //     console.log('Task executed every 45 seconds');
-    //   }
+        private mailService: MailService
+    ) {}
 
     //QUESTO è UN JOB DINAMICO CHE PUò ESSERE GENERATO A PARTIRE DA UNA CHIAMATA API 
     addCronJob(name: string, cronExpressions: CronExpression[]) {
@@ -36,8 +25,12 @@ export class CronService {
         }else{
             const jobUuid: string = uuid();
             cronExpressions.forEach(cronExpression => {
-                const job = new CronJob(cronExpression, () => {
+                const job = new CronJob(cronExpression, (job) => {
                     this.routeService.getAllRouteDetails(jobUuid);
+                    this.mailService.sendMail(
+                        `E' stato avviato il job ${name} in data ${new Date()}`,
+                        'AVVIO CRON JOB'
+                    )
                     console.warn(`time (${cronExpression}) for job ${name} to run!`);
                 });
             
@@ -47,7 +40,11 @@ export class CronService {
                 console.warn(
                 `job ${name} added for ${cronExpression}!`,
                 );
-            });            
+            }); 
+            this.mailService.sendMail(
+                `E' stato aggiunto un nuovo job il ${new Date()} che verrà schedulato nei seguenti orrari: ${JSON.stringify(cronExpressions)}`,
+                'AGGIUNTA NUOVO CRON JOB'
+            )
         }
     }
 

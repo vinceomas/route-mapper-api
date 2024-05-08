@@ -7,6 +7,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { RoutesModule } from './routes/routes.module';
 import { ConfigModule } from '@nestjs/config';
 import { AuthzModule } from './authz/authz.module';
+import { MailerModule } from '@nestjs-modules/mailer';
 
 @Module({
   imports: [
@@ -19,9 +20,19 @@ import { AuthzModule } from './authz/authz.module';
     RoutesModule,
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
+      envFilePath: '.env',
       isGlobal: true
     }),
-    AuthzModule
+    AuthzModule,
+    MailerModule.forRoot({
+      transport: {
+        host: process.env.EMAIL_HOST,
+        auth: {
+          user: process.env.EMAIL_USERNAME,
+          pass: process.env.EMAIL_PASSWORD,
+        },
+      },
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -15,17 +15,6 @@ export class RouteDetailController {
         private routeDetailService: RouteDetailService
     ){}
 
-    // @ApiBody({
-    //     type: RouteInformationDto
-    // })
-    // @Post()
-    // async calculaterouteDetailsInformation(@Body() routeInformationBody: RouteInformationDto){
-    //     console.log('TEST', routeInformationBody)
-    //     // return from(this.routeService.getrouteDetailsInfo(routeInformationBody.originLatitude, routeInformationBody.originLongitude, routeInformationBody.destinationLatitude, routeInformationBody.destinationLongitude)).pipe(
-    //     //     map(res => {return JSON.stringify(res.data)})
-    //     // )
-    // }
-
     @Get('/finAllrouteDetails')
     async findAllrouteDetails(){
         return this.routeDetailService.findAll();

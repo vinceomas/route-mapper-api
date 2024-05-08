@@ -10,7 +10,7 @@ import { EditRouteDto } from "../entities/route/edit-route.dto";
 import { HttpService } from "@nestjs/axios";
 import { map } from "rxjs";
 import { AxiosRequestConfig } from "axios";
-import { Client } from "@googlemaps/google-maps-services-js";
+import { Client, DirectionsResponseData, DirectionsRoute } from "@googlemaps/google-maps-services-js";
 import { RouteDetailService } from "./route-detail.service";
 import { ConfigService } from "@nestjs/config";
 
@@ -108,16 +108,18 @@ export class RouteService {
         })
         .then((r) => {
             console.log('MIO TEST', r.data);
-            r.data.routes.forEach(routeDetail => {
-                this.routeDetailService.add({
-                    routeId: route.id,
-                    jobId: jobId,
-                    date: new Date(),
-                    distanceText: routeDetail.legs[0].distance.text,
-                    distanceValue: routeDetail.legs[0].distance.value,
-                    durationText: routeDetail.legs[0].duration.text,
-                    durationValue: routeDetail.legs[0].duration.value
-                })
+            //Calcolare qual'è la route migliore basandomi su quella che ha il tempo più baso 
+            const routeWithLowestTime: DirectionsRoute = r.data.routes.reduce((acc, cur) => {
+                return cur.legs[0].duration.value < acc.legs[0].duration.value ? cur : acc
+            }, r.data.routes[0])
+            this.routeDetailService.add({
+                routeId: route.id, // TODO: questo deve esse l'arcId
+                jobId: jobId, 
+                date: new Date(),
+                distanceText: routeWithLowestTime.legs[0].distance.text,
+                distanceValue: routeWithLowestTime.legs[0].distance.value,
+                durationText: routeWithLowestTime.legs[0].duration.text,
+                durationValue: routeWithLowestTime.legs[0].duration.value
             })
         })
         .catch((e) => {

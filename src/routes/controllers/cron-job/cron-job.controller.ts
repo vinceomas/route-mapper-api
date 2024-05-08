@@ -7,23 +7,24 @@ import { CronService } from "src/routes/services/cron.service";
 @Controller('cronJob')
 export class CronJobController{
     public constructor(
-        private taskService: CronService
+        private cronService: CronService
     ){}
 
     @Get('/startCronJob')
     async startCronJob(){
         //TODO3: E' importante ritornare il jobID 
-        this.taskService.addCronJob('calculaterouteDetailsInformation', [CronExpression.EVERY_DAY_AT_7AM, CronExpression.EVERY_DAY_AT_9AM, CronExpression.EVERY_DAY_AT_NOON]); //only for test run job exery 10 seconds 
+        this.cronService.addCronJob('calculaterouteDetailsInformation', [CronExpression.EVERY_10_SECONDS]); //only for test run job exery 10 seconds 
+        //this.taskService.addCronJob('calculaterouteDetailsInformation', [CronExpression.EVERY_DAY_AT_7AM, CronExpression.EVERY_DAY_AT_9AM, CronExpression.EVERY_DAY_AT_NOON]);
         return "added task scheduled every 8 hours"
     }
 
     @Get('/stopCronJob')
     async stopCronJob(){
-        this.taskService.stopCronJob('calculaterouteDetailsInformation');
+        this.cronService.stopCronJob('calculaterouteDetailsInformation');
     }
 
     @Get('/stopAllCronJobs')
     async stopAllCronJobs(){
-        this.taskService.stopAllCronJob();
+        this.cronService.stopAllCronJob();
     }
 }
