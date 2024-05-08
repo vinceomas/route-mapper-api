@@ -36,13 +36,17 @@ export class RouteService {
         return this.routeMapper.modelRouteDto(route);
     }
 
-    public async add({originLatitude, originLongitude, destinationLatitude, destinationLongitude}: AddRouteDto): Promise<RouteDto>{
-        let route = new Route(originLatitude, originLongitude, destinationLatitude, destinationLongitude)
+    public async add({arcId, originNodeId, destinationNodeId, originLatitude, originLongitude, destinationLatitude, destinationLongitude}: AddRouteDto): Promise<RouteDto>{
+        let route = new Route(arcId, originNodeId, destinationNodeId, originLatitude, originLongitude, destinationLatitude, destinationLongitude)
         route = await this.routeRepository.save(route)
         return this.routeMapper.modelRouteDto(route)
     }
 
-    public async edit(id: number, {originLatitude, originLongitude, destinationLatitude, destinationLongitude, enabled}: EditRouteDto): Promise<RouteDto>{
+    public async addMany(routeToAdd: Route[]){
+        return await this.routeRepository.insert(routeToAdd);
+    }    
+
+    public async edit(id: number, {originLatitude, originLongitude, destinationLatitude, destinationLongitude, googleMapsRouteIdentifier, enabled}: EditRouteDto): Promise<RouteDto>{
         let route = await this.routeRepository.findOne({where: {id}})
         if(isNullOrUndefined(route))
             throw new NotFoundException();
@@ -52,6 +56,7 @@ export class RouteService {
         route.originLongitude = originLongitude;
         route.destinationLatitude = destinationLatitude;
         route.destinationLongitude = destinationLongitude;
+        route.googleMapsRouteIdentifier = googleMapsRouteIdentifier
 
         route = await this.routeRepository.save(route);
 
@@ -66,6 +71,12 @@ export class RouteService {
         route = await this.routeRepository.remove(route);
 
         return route;
+    }
+
+    public async deleteAllRoutes(): Promise<number>{
+        const countRouteToDelete = this.routeRepository.count();
+        await this.routeRepository.clear()
+        return countRouteToDelete;
     }
 
     public async getRouteDetail(route: Route, jobId: string){

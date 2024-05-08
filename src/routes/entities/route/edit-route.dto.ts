@@ -4,6 +4,18 @@ export class EditRouteDto{
 
     @IsString()
     @IsNotEmpty()
+    public readonly arcId: number;
+
+    @IsString()
+    @IsNotEmpty()
+    public readonly originNodeId: number;
+
+    @IsString()
+    @IsNotEmpty()
+    public readonly destinationNodeId: number;
+
+    @IsString()
+    @IsNotEmpty()
     public readonly originLongitude: string;
 
     @IsString()
@@ -17,6 +29,10 @@ export class EditRouteDto{
     @IsString()
     @IsNotEmpty()
     public readonly destinationLatitude: string;
+
+    @IsString()
+    @IsNotEmpty()
+    public readonly googleMapsRouteIdentifier: string | null;
 
     @IsBoolean()
     public readonly enabled: boolean;
