@@ -1,16 +1,17 @@
 import { Controller, Get, Param } from "@nestjs/common";
-import { CronExpression } from "@nestjs/schedule";
+import { ApiTags } from "@nestjs/swagger";
 import { RouteDetailService } from "src/routes/services/route-detail.service";
 import { RouteService } from "src/routes/services/route.service";
-import { TaskService } from "src/routes/services/task.service";
+import { CronService } from "src/routes/services/cron.service";
 import { v4 as uuid } from 'uuid';
 
+@ApiTags('Route Details')
 @Controller('routeDetail')
 export class RouteDetailController {
         
     public constructor(
         private routeService: RouteService,
-        private taskService: TaskService,
+        private taskService: CronService,
         private routeDetailService: RouteDetailService
     ){}
 
@@ -38,31 +39,12 @@ export class RouteDetailController {
     @Get('/findAllrouteDetails/:jobId')
     async findAllrouteDetailsByJobId(@Param('jobId') jobId: string){
         return this.routeDetailService.findByJobId(jobId)
-    }
-    
+    }    
 
     @Get()
     async calculateRouteDetailsInformation(){
         const jobUuid: string = uuid();
         this.routeService.getAllRouteDetails(jobUuid);
     }
-
-    @Get('/startCronJob')
-    async startCronJob(){
-        //TODO: change into EVERY_8_HOURS
-
-        //TODO2: delete all jobs with the same name 
-
-        //TODO3: E' importante ritornare il jobID 
-
-        this.taskService.addCronJob('calculaterouteDetailsInformation', CronExpression.EVERY_10_SECONDS); //only for test run job exery 10 seconds 
-        return "added task scheduled every 8 hours"
-    }
-
-    @Get('/stopCronJob')
-    async stopCronJob(){
-        this.taskService.stopCronJob('calculaterouteDetailsInformation');
-    }
-
 
 }

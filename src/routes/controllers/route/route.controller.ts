@@ -1,13 +1,13 @@
 import { Body, Controller, Delete, Get, HttpException, Param, Post, Put, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiProperty } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsNotEmpty } from 'class-validator';
 import { AddRouteDto } from 'src/routes/entities/route/add-route.dto';
 import { EditRouteDto } from 'src/routes/entities/route/edit-route.dto';
 import { RouteDto } from 'src/routes/entities/route/route.dto';
 import { RouteService } from 'src/routes/services/route.service';
-import { TaskService } from 'src/routes/services/task.service';
+import { CronService } from 'src/routes/services/cron.service';
 import { SUPPORTED_FILES, multerOptions, uploadFileWithInfo } from './csv-parser.utils';
 
 export class ReqBodyDto {
@@ -24,12 +24,13 @@ export class ReqBodyDto {
     eraseOldRoutesData: boolean;
 }
 
+@ApiTags('Routes')
 @Controller('route')
 export class RouteController {
     
     public constructor(
         private routeService: RouteService,
-        private taskService: TaskService
+        private taskService: CronService
     ){}
     
     @ApiBearerAuth()

@@ -5,7 +5,7 @@ import { RouteService } from "./route.service";
 import { v4 as uuid } from 'uuid';
 
 @Injectable()
-export class TaskService {
+export class CronService {
     constructor(
         private schedulerRegistry: SchedulerRegistry,
         private routeService: RouteService,
@@ -25,26 +25,29 @@ export class TaskService {
     //   }
 
     //QUESTO è UN JOB DINAMICO CHE PUò ESSERE GENERATO A PARTIRE DA UNA CHIAMATA API 
-    addCronJob(name: string, cronExpression: CronExpression) {
+    addCronJob(name: string, cronExpressions: CronExpression[]) {
         //Check if there is another cron job with the same name
-        const existJob = this.schedulerRegistry.doesExist("cron", name)
+        let existJob = false;
+        cronExpressions.forEach((cronExpression) => existJob = this.schedulerRegistry.doesExist("cron", `name+${cronExpression.toString()}`)) 
         if(existJob){                
             console.warn(
             `job ${name} già presente, occorre interrompere il job precedente per poterne creare uno nuovo`,
             );
         }else{
             const jobUuid: string = uuid();
-            const job = new CronJob(cronExpression, () => {
-                this.routeService.getAllRouteDetails(jobUuid);
-                console.warn(`time (${cronExpression}) for job ${name} to run!`);
-            });
-        
-            this.schedulerRegistry.addCronJob(name, job);
-            job.start();
-        
-            console.warn(
-            `job ${name} added for each minute at ${cronExpression} seconds!`,
-            );
+            cronExpressions.forEach(cronExpression => {
+                const job = new CronJob(cronExpression, () => {
+                    this.routeService.getAllRouteDetails(jobUuid);
+                    console.warn(`time (${cronExpression}) for job ${name} to run!`);
+                });
+            
+                this.schedulerRegistry.addCronJob(`name+${cronExpression.toString()}`, job);
+                job.start();
+            
+                console.warn(
+                `job ${name} added for ${cronExpression}!`,
+                );
+            });            
         }
     }
 
@@ -58,5 +61,10 @@ export class TaskService {
                 `job ${name} not exist!`,
             );
         }
+    }
+
+    stopAllCronJob(){
+        const jobs = this.schedulerRegistry.getCronJobs();
+        jobs.forEach(job => job.stop());
     }
 }
