@@ -1,4 +1,4 @@
-import { RouteDto } from "../route/route.dto";
+import { TimeSlotIdentifier } from "src/routes/types/types";
 
 export class RouteDetailDto {
     public readonly id: number;
@@ -9,6 +9,7 @@ export class RouteDetailDto {
     public readonly distanceValue: number;
     public readonly durationText: string;
     public readonly durationValue: number;
+    public readonly timeSlotIdentifier: TimeSlotIdentifier;
 
     public constructor(opts?: RouteDetailDto){
         Object.assign(this, opts)

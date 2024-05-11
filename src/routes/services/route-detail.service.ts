@@ -9,6 +9,7 @@ import { ConfigService } from "@nestjs/config";
 import { RouteService } from "./route.service";
 import { Logger } from "@nestjs/common";
 import { WorkSheet, read, utils, write } from 'xlsx';
+import { TimeSlotIdentifier } from "../types/types";
 
 export class RouteDetailService {
     public constructor(
@@ -62,12 +63,12 @@ export class RouteDetailService {
     }
 
     public async add(routeDetail: Partial<RouteDetail>): Promise<RouteDetail>{
-        let currentRouteDetail = new RouteDetail(routeDetail.arcId, routeDetail.jobId, routeDetail.date, routeDetail.distanceText, routeDetail.distanceValue, routeDetail.durationText, routeDetail.durationValue,);
+        let currentRouteDetail = new RouteDetail(routeDetail.arcId, routeDetail.jobId, routeDetail.date, routeDetail.distanceText, routeDetail.distanceValue, routeDetail.durationText, routeDetail.durationValue, routeDetail.timeSlotIdentifier);
         currentRouteDetail = await this.routeDetailRepository.save(currentRouteDetail);
         return this.routeDetailMapper.modelRouteDetailDto(currentRouteDetail);
     }
 
-    public async getAllRouteDetails(jobId: string){
+    public async getAllRouteDetails(jobId: string, timeSlotIdentifier: TimeSlotIdentifier){
         let routesDetailToAdd: Partial<RouteDetail>[][] = [];
         let matrixRow: Partial<RouteDetail>[] = [];
         const routes = await this.routeService.findAll();
@@ -77,7 +78,7 @@ export class RouteDetailService {
                 this.logger.log(`CALCOLO DELLA ROUTE ${index}`);
             }
             index = index + 1;
-            const routeDetail = await this.getRouteDetail(route, jobId);
+            const routeDetail = await this.getRouteDetail(route, jobId, timeSlotIdentifier);
             matrixRow.push(routeDetail);
             if(matrixRow.length > 2000){
                 routesDetailToAdd.push(matrixRow);
@@ -111,7 +112,11 @@ export class RouteDetailService {
                 'Partenza', 
                 'Arrivo', 
                 'Media distanza 1', 
+                'Media distanza 2',
+                'Media distanza 3',
                 'Tempo 1',
+                'Tempo 2',
+                'Tempo 3',
             ]
         ];
 
@@ -120,7 +125,7 @@ export class RouteDetailService {
             //Recupero tutti i dettagli di una determinata route 
             await this.findByDateAndId(fromDate, toDate, route.arcId).then(routeDetails => {
                 //Eseguo la media del tempo e delle distanze 
-                let averages = this.calculateAverage(routeDetails);
+                let averages = this.calculateRouteDetailAverage(routeDetails);
                 //Stampo i irsultati nel csv
                 data.push(
                     [
@@ -129,8 +134,12 @@ export class RouteDetailService {
                         route.destinationNodeId.toString(),
                         `${route.originLatitude}, ${route.originLongitude}`, 
                         `${route.destinationLatitude}, ${route.destinationLongitude}`,
-                        averages.averageDistance.toString(),
-                        averages.averageDuration.toString()
+                        averages[TimeSlotIdentifier.SEVEN_TO_NINE_AM].averageDistance.toString(),
+                        averages[TimeSlotIdentifier.NINE_TO_ELEVEN_AM].averageDistance.toString(),
+                        averages[TimeSlotIdentifier.ELEVEN_TO_TWELVE].averageDistance.toString(),
+                        averages[TimeSlotIdentifier.SEVEN_TO_NINE_AM].averageDuration.toString(),
+                        averages[TimeSlotIdentifier.NINE_TO_ELEVEN_AM].averageDuration.toString(),
+                        averages[TimeSlotIdentifier.ELEVEN_TO_TWELVE].averageDuration.toString()
 
                     ]
                 )
@@ -148,20 +157,29 @@ export class RouteDetailService {
 
     }
 
-    private calculateAverage(routeDetail: RouteDetail[]): { averageDuration: number; averageDistance: number } {
-        const { totalDistance, totalDuration } = routeDetail.reduce((acc, route) => {
-          acc.totalDistance += route.distanceValue;
-          acc.totalDuration += route.durationValue;
-          return acc;
-        }, { totalDistance: 0, totalDuration: 0 });
-    
-        const averageDuration = routeDetail.length > 0 ? totalDuration / routeDetail.length : 0;
-        const averageDistance = routeDetail.length > 0 ? totalDistance / routeDetail.length : 0;
-    
-        return { averageDuration, averageDistance };
+    private calculateRouteDetailAverage(routeDetail: RouteDetail[]): {[id: number]: {averageDuration: number; averageDistance: number}} {
+        let averages: {[id: number]: {averageDuration: number; averageDistance: number}} = {};
+        for (const key of Object.values(TimeSlotIdentifier)) {
+            if(!isNaN(Number(key))){
+                console.log(key);
+                const routeDetailOfCurrentTimeSlot = routeDetail.filter(routeDetail => routeDetail.timeSlotIdentifier == key)
+                const { totalDistance, totalDuration } = routeDetailOfCurrentTimeSlot.reduce((acc, route) => {
+                    acc.totalDistance += route.distanceValue;
+                    acc.totalDuration += route.durationValue;
+                    return acc;
+                  }, { totalDistance: 0, totalDuration: 0 });
+              
+                const averageDuration = routeDetailOfCurrentTimeSlot.length > 0 ? totalDuration / routeDetailOfCurrentTimeSlot.length : 0;
+                const averageDistance = routeDetailOfCurrentTimeSlot.length > 0 ? totalDistance / routeDetailOfCurrentTimeSlot.length : 0;
+              
+                averages[key] = {averageDuration, averageDistance}
+            }
+        }
+        return averages
+
       }
 
-    private async getRouteDetail(route: Route, jobId: string): Promise<Partial<RouteDetail>>{
+    private async getRouteDetail(route: Route, jobId: string, timeSlotIdentifier: TimeSlotIdentifier): Promise<Partial<RouteDetail>>{
         const client = new Client({});
 
         try {
@@ -192,7 +210,8 @@ export class RouteDetailService {
                 distanceText: routeWithLowestTime.legs[0].distance.text,
                 distanceValue: routeWithLowestTime.legs[0].distance.value,
                 durationText: routeWithLowestTime.legs[0].duration.text,
-                durationValue: routeWithLowestTime.legs[0].duration.value
+                durationValue: routeWithLowestTime.legs[0].duration.value,
+                timeSlotIdentifier
             };
     
             //console.log('Elaborata la route con arcId', route.arcId);

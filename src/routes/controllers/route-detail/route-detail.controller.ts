@@ -3,6 +3,7 @@ import { Response } from 'express';
 import { ApiTags } from "@nestjs/swagger";
 import { RouteDetailService } from "src/routes/services/route-detail.service";
 import { v4 as uuid } from 'uuid';
+import { TimeSlotIdentifier } from "src/routes/types/types";
 
 @ApiTags('Route Details')
 @Controller('routeDetail')
@@ -27,10 +28,10 @@ export class RouteDetailController {
         return this.routeDetailService.findByJobId(jobId)
     }    
 
-    @Get('/retrieveRouteDetails')
-    async retrieveRouteDetails(){
+    @Get('/retrieveRouteDetails/:timeSlotIdentifier')
+    async retrieveRouteDetails(@Param('timeSlotIdentifier') timeSlotIdentifier: TimeSlotIdentifier){
         const jobUuid: string = uuid();
-        return this.routeDetailService.getAllRouteDetails(jobUuid);
+        return this.routeDetailService.getAllRouteDetails(jobUuid, timeSlotIdentifier);
     }
 
     @Get('/downlodRouteDetailsCsv/:fromDate/:toDate')
