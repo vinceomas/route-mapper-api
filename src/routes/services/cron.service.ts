@@ -4,12 +4,13 @@ import { CronJob } from "cron";
 import { RouteService } from "./route.service";
 import { v4 as uuid } from 'uuid';
 import { MailService } from "./mail.service";
+import { RouteDetailService } from "./route-detail.service";
 
 @Injectable()
 export class CronService {
     constructor(
         private schedulerRegistry: SchedulerRegistry,
-        private routeService: RouteService,
+        private routeDetailService: RouteDetailService,
         private mailService: MailService
     ) {}
 
@@ -26,7 +27,7 @@ export class CronService {
             const jobUuid: string = uuid();
             cronExpressions.forEach(cronExpression => {
                 const job = new CronJob(cronExpression, (job) => {
-                    this.routeService.getAllRouteDetails(jobUuid);
+                    this.routeDetailService.getAllRouteDetails(jobUuid);
                     this.mailService.sendMail(
                         `E' stato avviato il job ${name} in data ${new Date()}`,
                         'AVVIO CRON JOB'

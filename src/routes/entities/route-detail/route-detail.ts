@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, PrimaryColumn, PrimaryGeneratedColumn, Unique } from "typeorm";
 
 @Entity()
 export class RouteDetail {
@@ -6,7 +6,7 @@ export class RouteDetail {
     public id: number;
 
     @Column()
-    public routeId: number;
+    public arcId: number;
 
     @Column()
     public jobId: string;
@@ -26,8 +26,8 @@ export class RouteDetail {
     @Column()
     public durationValue: number
 
-    public constructor(routeId: number, jobId: string, date: Date, distanceText: string, distanceValue: number, durationText: string, durationValue: number){
-        this.routeId = routeId;
+    public constructor(arcId: number, jobId: string, date: Date, distanceText: string, distanceValue: number, durationText: string, durationValue: number){
+        this.arcId = arcId;
         this.jobId = jobId;
         this.date = date;
         this.distanceText = distanceText;

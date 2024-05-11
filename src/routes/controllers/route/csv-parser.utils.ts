@@ -70,10 +70,9 @@ export async function uploadFileWithInfo(file: any, body: ReqBodyDto, routeServi
   function getRouteToAdd(csvRoutes: CsvRoute[]): Route[][]{
     let addedRoutes = 0;
     let notAddedRoutes = 0;
-    let routesToAdd: Route[][] = [];
-
-    
+    let routesToAdd: Route[][] = [];    
     let matrixRow: Route[] = [];
+    
     csvRoutes.map(async csvRoute => {
         const arcId = Number(csvRoute['ID arco']);
         const originNodeId = Number(csvRoute['ID nodo partenza']);

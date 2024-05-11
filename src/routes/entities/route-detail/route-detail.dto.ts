@@ -2,7 +2,7 @@ import { RouteDto } from "../route/route.dto";
 
 export class RouteDetailDto {
     public readonly id: number;
-    public readonly routeId: number;
+    public readonly arcId: number;
     public readonly jobId: string;
     public readonly date: Date;
     public readonly distanceText: string;

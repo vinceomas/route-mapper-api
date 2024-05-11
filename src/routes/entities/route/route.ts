@@ -6,7 +6,7 @@ export class Route {
     @PrimaryGeneratedColumn()
     public id: number;
 
-    @Column()
+    @Column({unique: true})
     public arcId: number;
 
     @Column()

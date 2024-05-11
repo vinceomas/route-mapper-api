@@ -1,7 +1,7 @@
 import { AddRouteDto } from "../route/add-route.dto";
 
 export class AddRouteDetailDto {
-    public readonly routeId: number;
+    public readonly arcId: number;
     public readonly jobId: number;
     public readonly date: Date;
     public readonly distanceText: string;

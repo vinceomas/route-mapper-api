@@ -4,7 +4,7 @@ import { RouteDetailDto } from "src/routes/entities/route-detail/route-detail.dt
 
 @Injectable()
 export class RouteDetailMapperService{
-    public modelRouteDetailDto({id, routeId, jobId, date, distanceText, distanceValue, durationText, durationValue}: RouteDetail){
-        return new RouteDetailDto({id, routeId, jobId, date, distanceText, distanceValue, durationText, durationValue})
+    public modelRouteDetailDto({id, arcId, jobId, date, distanceText, distanceValue, durationText, durationValue}: RouteDetail){
+        return new RouteDetailDto({id, arcId, jobId, date, distanceText, distanceValue, durationText, durationValue})
     }
 }

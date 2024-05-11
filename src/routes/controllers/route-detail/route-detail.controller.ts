@@ -1,8 +1,6 @@
 import { Controller, Get, Param } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { RouteDetailService } from "src/routes/services/route-detail.service";
-import { RouteService } from "src/routes/services/route.service";
-import { CronService } from "src/routes/services/cron.service";
 import { v4 as uuid } from 'uuid';
 
 @ApiTags('Route Details')
@@ -10,8 +8,6 @@ import { v4 as uuid } from 'uuid';
 export class RouteDetailController {
         
     public constructor(
-        private routeService: RouteService,
-        private taskService: CronService,
         private routeDetailService: RouteDetailService
     ){}
 
@@ -20,9 +16,9 @@ export class RouteDetailController {
         return this.routeDetailService.findAll();
     }
 
-    @Get('/findAllrouteDetails/:routeId')
-    async findAllrouteDetailsByRouteId(@Param('routeId') routeId: number){
-        return this.routeDetailService.findByRouteId(routeId)
+    @Get('/findAllrouteDetails/:arcId')
+    async findAllrouteDetailsByArcId(@Param('arcId') arcId: number){
+        return this.routeDetailService.findByArcId(arcId)
     }
 
     @Get('/findAllrouteDetails/:jobId')
@@ -30,10 +26,10 @@ export class RouteDetailController {
         return this.routeDetailService.findByJobId(jobId)
     }    
 
-    @Get()
+    @Get('/calculateRouteDetailsInformation')
     async calculateRouteDetailsInformation(){
         const jobUuid: string = uuid();
-        this.routeService.getAllRouteDetails(jobUuid);
+        return this.routeDetailService.getAllRouteDetails(jobUuid);
     }
 
 }
