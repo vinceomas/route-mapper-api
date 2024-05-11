@@ -36,6 +36,7 @@
     "class-validator": "^0.14.1",
     "core-js": "^3.37.0",
     "jwks-rsa": "^3.1.0",
+    "nest-winston": "^1.9.4",
     "nodemailer": "^6.9.13",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

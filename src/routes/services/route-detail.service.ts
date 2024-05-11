@@ -1,4 +1,4 @@
-import { Repository } from "typeorm";
+import { InsertResult, Repository } from "typeorm";
 import { RouteDetail } from "../entities/route-detail/route-detail";
 import { RouteDetailMapperService } from "./route-detail-mapper/route-detail-mapper.service";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -7,13 +7,15 @@ import { Route } from "../entities/route/route";
 import { Client, DirectionsResponse, DirectionsRoute } from "@googlemaps/google-maps-services-js";
 import { ConfigService } from "@nestjs/config";
 import { RouteService } from "./route.service";
+import { Logger } from "@nestjs/common";
 
 export class RouteDetailService {
     public constructor(
         @InjectRepository(RouteDetail) private readonly routeDetailRepository: Repository<RouteDetail>,
         private readonly routeDetailMapper: RouteDetailMapperService,
         private readonly configService: ConfigService,
-        private readonly routeService: RouteService
+        private readonly routeService: RouteService,
+        private readonly logger: Logger,
     ){}
 
     public async findAll(): Promise<RouteDetailDto[]>{
@@ -38,62 +40,37 @@ export class RouteDetailService {
     }
 
     public async getAllRouteDetails(jobId: string){
+        let routesDetailToAdd: Partial<RouteDetail>[][] = [];
+        let matrixRow: Partial<RouteDetail>[] = [];
         const routes = await this.routeService.findAll();
         let index = 0;
         for(const route of routes){
             if ((index + 1) % 1000 === 0){
-                console.log(`CALCOLO DELLA ROUTE ${index}`);
+                this.logger.log(`CALCOLO DELLA ROUTE ${index}`);
             }
             index = index + 1;
             const routeDetail = await this.getRouteDetail(route, jobId);
-            await this.add(routeDetail);
+            matrixRow.push(routeDetail);
+            if(matrixRow.length > 2000){
+                routesDetailToAdd.push(matrixRow);
+                matrixRow = [];
+            }
+            //await this.add(routeDetail);
         }
-        // await this.routeService.findAll().then(async routes => {
-        //     const routeCount = routes.length;
-        //     console.log('NUMERO DI ROUTES DA CALCOLARE', routeCount)
-        //     await Promise.all(
-        //         routes.map(async (route, index) => {
-        //             if ((index + 1) % 1000 === 0){
-        //                 console.log(`CALCOLO DELLA ROUTE ${index}`);
-        //             }
-        //             return this.getRouteDetail(route, jobId)
-        //         })
-        //     ).then(async directionResponse => {
-        //         await Promise.all(
-        //             directionResponse.map(async (routeDetail, index) => {
-        //                 if ((index + 1) % 1000 === 0){
-        //                     console.log(`INSERIMENTO DELLA ROUTE ${index}`);
-        //                 }
-        //                 return this.add(routeDetail);
-        //             })
-        //         )
-        //     })
-        //     // return await Promise.all(
-        //     //     routes.map(async (route, index) => {
-        //     //         if ((index + 1) % 1000 === 0){
-        //     //             console.log(`CALCOLO DELLA ROUTE ${index}`);
-        //     //         }
-        //     //         await this.getRouteDetail(route, jobId);
-        //     //         await this.getRouteDetail(route, jobId).then(async directionResponse => {
-        //     //             const routeWithLowestTime: DirectionsRoute = directionResponse.data.routes.reduce((acc, cur) => {
-        //     //                 return cur.legs[0].duration.value < acc.legs[0].duration.value ? cur : acc
-        //     //             }, directionResponse.data.routes[0])
-        //     //             await this.add({
-        //     //                 arcId: route.arcId,
-        //     //                 jobId: jobId, 
-        //     //                 date: new Date(),
-        //     //                 distanceText: routeWithLowestTime.legs[0].distance.text,
-        //     //                 distanceValue: routeWithLowestTime.legs[0].distance.value,
-        //     //                 durationText: routeWithLowestTime.legs[0].duration.text,
-        //     //                 durationValue: routeWithLowestTime.legs[0].duration.value
-        //     //             })
-        //     //         })
-        //     //         .catch(err => {
-        //     //             console.log('ERRORE DURANTE IL PROCESSO DELLA ROPUTE', index)
-        //     //         })
-        //     //     })
-        //     // )
-        // })
+        if(matrixRow.length > 0){
+            routesDetailToAdd.push(matrixRow);
+            matrixRow = [];
+        }
+
+        const insertOperations: Promise<InsertResult>[] = routesDetailToAdd.map((routesToAdd, index) => {
+            this.logger.log(`Inserimento della trance: ${index}`)
+            return this.routeDetailRepository.insert(routesToAdd as Route[]);
+        })
+
+        await Promise.all(insertOperations).then(insertOperationResults => {
+            const routesDetailAdded = insertOperationResults.reduce((acc, insertResult) => acc + insertResult.generatedMaps.length, 0)
+            this.logger.log(`PERCORSI AGGIUNTI: ${routesDetailAdded}`)
+        })
     }
 
     private async getRouteDetail(route: Route, jobId: string): Promise<Partial<RouteDetail>>{
@@ -133,7 +110,8 @@ export class RouteDetailService {
             //console.log('Elaborata la route con arcId', route.arcId);
             return routeDetail;
         } catch (err) {
-            console.error('ERRORE DURANTE IL PROCESSO DELLA ROUTE:', err);
+            this.logger.error('ERRORE DURANTE IL PROCESSO DELLA ROUTE:');
+            this.logger.error(err)
             throw err; // Rilancia l'errore per gestirlo esternamente, se necessario
         }
     }

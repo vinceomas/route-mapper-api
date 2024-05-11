@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { Route } from './entities/route/route';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RouteMapperService } from './services/route-mapper/route-mapper.service';
@@ -18,7 +18,7 @@ import { MailService } from './services/mail.service';
         TypeOrmModule.forFeature([Route, RouteDetail]),
         HttpModule
     ],
-    providers: [RouteMapperService, RouteService, CronService, RouteDetailService, RouteDetailMapperService, MailService],
+    providers: [RouteMapperService, RouteService, CronService, RouteDetailService, RouteDetailMapperService, MailService, Logger],
     controllers: [RouteController, RouteDetailController, CronJobController]
 })
 export class RoutesModule {}

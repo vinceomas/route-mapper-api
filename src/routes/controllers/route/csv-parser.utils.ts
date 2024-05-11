@@ -1,5 +1,5 @@
 import { extname } from 'path';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { ReqBodyDto } from './route.controller';
 import { read, utils } from 'xlsx';
 import { RouteService } from 'src/routes/services/route.service';
@@ -37,12 +37,13 @@ export type CsvRoute = {
 }
 
 export async function uploadFileWithInfo(file: any, body: ReqBodyDto, routeService: RouteService, eraseOldRoutesData: boolean) {
+    const logger = new Logger('UploadFileWithInfo');
     if(eraseOldRoutesData){
-        await routeService.deleteAllRoutes().then(deletedRoutes => console.log(`SONO STATI CANCELLATI ${deletedRoutes} PERCORSI`));        
+        await routeService.deleteAllRoutes().then(deletedRoutes => logger.log(`SONO STATI CANCELLATI ${deletedRoutes} PERCORSI`));        
     }
     const wb = read(file.buffer);
     const csvRoutes: CsvRoute[] = utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-    console.log('Numero di righe nel file CSV', csvRoutes.length)
+    logger.log(`Numero di righe nel file CSV ${csvRoutes.length}`)
     /**
      * Per velocizzare l'inserimento uso la bulkInsert di SQL 
      * SQLlite ha un limite di variabili che possono essere passate a una query SQL quindi non posso creare un'unica insert con tutte le righe del CSV
@@ -53,7 +54,7 @@ export async function uploadFileWithInfo(file: any, body: ReqBodyDto, routeServi
     
 
     const insertOperations: Promise<InsertResult>[] = routesToAdd.map((routesToAdd, index) => {
-        console.log('Inserimento della trance: ', index)
+        logger.log(`Inserimento della trance: ${index}`)
         return routeService.addMany(routesToAdd as Route[]);
     })
     
@@ -62,12 +63,13 @@ export async function uploadFileWithInfo(file: any, body: ReqBodyDto, routeServi
         const routesAdded = insertOperationResults.reduce((acc, insertResult) => acc + insertResult.generatedMaps.length, 0)
         const { originalname, filename: sourceFileName } = file;
         const { chunkSize = 100 } = body;
-        console.log(originalname, sourceFileName, chunkSize);
-        console.log('PERCORSI AGGIUNTI: ', routesAdded)
+        logger.log(originalname, sourceFileName, chunkSize);
+        logger.log(`PERCORSI AGGIUNTI: ${routesAdded}`)
     })
   }
 
   function getRouteToAdd(csvRoutes: CsvRoute[]): Route[][]{
+    const logger = new Logger('GetRouteToAdd');
     let addedRoutes = 0;
     let notAddedRoutes = 0;
     let routesToAdd: Route[][] = [];    
@@ -113,8 +115,8 @@ export async function uploadFileWithInfo(file: any, body: ReqBodyDto, routeServi
     if (matrixRow.length > 0){
         routesToAdd.push(matrixRow);
     }
-    console.log('Percorsi aggiunti alla matrice', addedRoutes);
-    console.log('Percorsi scartati', notAddedRoutes)
-    console.log('Numero di trance create', routesToAdd.length)
+    logger.log(`'Percorsi aggiunti alla matrice ${addedRoutes}`);
+    logger.log(`'Percorsi scartati ${notAddedRoutes}`);
+    logger.log(`'Numero di trance create ${routesToAdd.length}`);
     return routesToAdd;
   }

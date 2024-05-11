@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Route } from "../entities/route/route";
 import { RouteMapperService } from "./route-mapper/route-mapper.service";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -20,6 +20,7 @@ export class RouteService {
     public constructor(
         @InjectRepository(Route) private readonly routeRepository: Repository<Route>,
         private readonly routeMapper: RouteMapperService,
+        private readonly logger: Logger,
     ){}
 
     public async findAll(): Promise<RouteDto[]>{

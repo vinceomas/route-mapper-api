@@ -1,9 +1,9 @@
 import { MailerService } from "@nestjs-modules/mailer";
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 
 @Injectable()
 export class MailService{
-    constructor(private readonly mailerService: MailerService){}
+    constructor(private readonly mailerService: MailerService, private readonly logger: Logger){}
 
     sendMail(message: string, subject: string){
         this.mailerService.sendMail({
@@ -12,10 +12,12 @@ export class MailService{
             subject,
             text: message
         }).then((res) => {
-            console.log('MAIL INVIATA', res);
+            this.logger.log('MAIL INVIATA');
+            this.logger.log(res)
         })
         .catch(err => {
-            console.log('ERRORE INVIO MAIL', err)
+            this.logger.error('ERRORE INVIO MAIL')
+            this.logger.error(err)
         })
     }
 }

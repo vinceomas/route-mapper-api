@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpException, Param, Post, Put, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpException, Logger, Param, Post, Put, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiProperty, ApiTags } from '@nestjs/swagger';
@@ -30,7 +30,8 @@ export class RouteController {
     
     public constructor(
         private routeService: RouteService,
-        private taskService: CronService
+        private taskService: CronService,
+        private readonly logger: Logger,
     ){}
     
     @ApiBearerAuth()
@@ -78,12 +79,13 @@ export class RouteController {
     @UseInterceptors(FileInterceptor('file', multerOptions))
     async upload(@UploadedFile() file, @Body() body: ReqBodyDto) {
         if (!file) {
+            this.logger.error(`Please provide correct file name with extension ${JSON.stringify(SUPPORTED_FILES)}`)
             throw new HttpException(
             `Please provide correct file name with extension ${JSON.stringify(SUPPORTED_FILES)}`,
             400
             );
         }
-        console.log('FILE VALIDO');
+        this.logger.log('FILE VALIDO');
         return uploadFileWithInfo(file, body, this.routeService, body.eraseOldRoutesData);
     }
 
