@@ -1,4 +1,4 @@
-import { InsertResult, Repository } from "typeorm";
+import { InsertResult, LessThanOrEqual, MoreThanOrEqual, Repository } from "typeorm";
 import { RouteDetail } from "../entities/route-detail/route-detail";
 import { RouteDetailMapperService } from "./route-detail-mapper/route-detail-mapper.service";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -8,6 +8,7 @@ import { Client, DirectionsResponse, DirectionsRoute } from "@googlemaps/google-
 import { ConfigService } from "@nestjs/config";
 import { RouteService } from "./route.service";
 import { Logger } from "@nestjs/common";
+import { WorkSheet, read, utils, write } from 'xlsx';
 
 export class RouteDetailService {
     public constructor(
@@ -31,6 +32,33 @@ export class RouteDetailService {
     public async findByArcId(arcId: number): Promise<RouteDetailDto[]>{
         const routeDetails = await this.routeDetailRepository.find({where: {arcId: arcId}});
         return routeDetails.map(this.routeDetailMapper.modelRouteDetailDto);
+    }
+
+    public async findByDateAndId(fromDate: Date, toDate: Date, arcId: number): Promise<RouteDetailDto[]>{
+        // const routeDetails = await this.routeDetailRepository.find({
+        //     where: [
+        //         {
+        //             arcId: arcId
+        //         },
+        //         {                
+        //             date: LessThanOrEqual(toDate)
+        //         },
+        //         {
+        //             date: MoreThanOrEqual(fromDate)
+        //         }
+        //     ],
+
+        // })
+
+        const routeDetails = await this.routeDetailRepository
+            .createQueryBuilder('entity')
+            .where('entity.arcId = :arcId', { arcId })
+            .andWhere('entity.date BETWEEN :fromDate AND :toDate', { fromDate, toDate })
+            .getMany();
+
+        return routeDetails.map(this.routeDetailMapper.modelRouteDetailDto);
+
+
     }
 
     public async add(routeDetail: Partial<RouteDetail>): Promise<RouteDetail>{
@@ -72,6 +100,66 @@ export class RouteDetailService {
             this.logger.log(`PERCORSI AGGIUNTI: ${routesDetailAdded}`)
         })
     }
+
+    public async getRouteWithDetailsCsv(fromDate: Date, toDate: Date){
+        // Creazione del workbook
+        let data = [
+            [
+                'Id arco', 
+                'Id nodo partenza', 
+                'ID nodo arrivo', 
+                'Partenza', 
+                'Arrivo', 
+                'Media distanza 1', 
+                'Tempo 1',
+            ]
+        ];
+
+        const routes = await this.routeService.findAll();
+        for(const route of routes){
+            //Recupero tutti i dettagli di una determinata route 
+            await this.findByDateAndId(fromDate, toDate, route.arcId).then(routeDetails => {
+                //Eseguo la media del tempo e delle distanze 
+                let averages = this.calculateAverage(routeDetails);
+                //Stampo i irsultati nel csv
+                data.push(
+                    [
+                        route.arcId.toString(), 
+                        route.originNodeId.toString(),
+                        route.destinationNodeId.toString(),
+                        `${route.originLatitude}, ${route.originLongitude}`, 
+                        `${route.destinationLatitude}, ${route.destinationLongitude}`,
+                        averages.averageDistance.toString(),
+                        averages.averageDuration.toString()
+
+                    ]
+                )
+            })
+        }
+
+        const workbook = utils.book_new();
+        const worksheet = utils.aoa_to_sheet(data);        
+        utils.book_append_sheet(workbook, worksheet, 'Dati');
+
+        // Conversione del workbook in un buffer
+        const buffer = write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        return buffer;
+
+    }
+
+    private calculateAverage(routeDetail: RouteDetail[]): { averageDuration: number; averageDistance: number } {
+        const { totalDistance, totalDuration } = routeDetail.reduce((acc, route) => {
+          acc.totalDistance += route.distanceValue;
+          acc.totalDuration += route.durationValue;
+          return acc;
+        }, { totalDistance: 0, totalDuration: 0 });
+    
+        const averageDuration = routeDetail.length > 0 ? totalDuration / routeDetail.length : 0;
+        const averageDistance = routeDetail.length > 0 ? totalDistance / routeDetail.length : 0;
+    
+        return { averageDuration, averageDistance };
+      }
 
     private async getRouteDetail(route: Route, jobId: string): Promise<Partial<RouteDetail>>{
         const client = new Client({});
@@ -115,6 +203,8 @@ export class RouteDetailService {
             throw err; // Rilancia l'errore per gestirlo esternamente, se necessario
         }
     }
+
+
 
 
 }
