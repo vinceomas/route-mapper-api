@@ -9,6 +9,7 @@ import { RouteDto } from 'src/routes/entities/route/route.dto';
 import { RouteService } from 'src/routes/services/route.service';
 import { CronService } from 'src/routes/services/cron.service';
 import { SUPPORTED_FILES, multerOptions, uploadFileWithInfo } from './csv-parser.utils';
+import { JwtAuthGuard } from 'src/authz/jwt.guard';
 
 export class ReqBodyDto {
     @ApiProperty({ required: true })
@@ -26,6 +27,8 @@ export class ReqBodyDto {
 
 @ApiTags('Routes')
 @Controller('route')
+@UseGuards(AuthGuard('jwt'))
+@UseGuards(JwtAuthGuard)
 export class RouteController {
     
     public constructor(
@@ -41,27 +44,36 @@ export class RouteController {
         return this.routeService.findAll();
     }
     
+    @ApiBearerAuth()
+    @UseGuards(AuthGuard('jwt'))
     @Get(':id')
     public findOne(@Param('id') id: number): Promise<RouteDto>{
         return this.routeService.findOne(id);
     }
 
+    @ApiBearerAuth()
+    @UseGuards(AuthGuard('jwt'))
     @Put(':id')
     public edit(@Param('id') id: number, @Body() coordinate: EditRouteDto): Promise<RouteDto>{
         return this.routeService.edit(id, coordinate);
     }
 
+    @ApiBearerAuth()
+    @UseGuards(AuthGuard('jwt'))
     @Post()
     public add(@Body() route: AddRouteDto): Promise<RouteDto>{
         return this.routeService.add(route);
     }
 
+    @ApiBearerAuth()
+    @UseGuards(AuthGuard('jwt'))
     @Delete(':id')
     public remove(@Param('id') id: number){
         return this.routeService.remove(id);
     }
     
-    
+    @ApiBearerAuth()
+    @UseGuards(AuthGuard('jwt'))
     @Post("/massiveInsert")
     @ApiConsumes('multipart/form-data')
     @ApiBody({
