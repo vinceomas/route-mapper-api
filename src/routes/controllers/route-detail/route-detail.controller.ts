@@ -1,9 +1,10 @@
-import { Controller, Get, Param, Res } from "@nestjs/common";
+import { Controller, Get, Param, Res, UseGuards } from "@nestjs/common";
 import { Response } from 'express';
 import { ApiTags } from "@nestjs/swagger";
 import { RouteDetailService } from "src/routes/services/route-detail.service";
 import { v4 as uuid } from 'uuid';
 import { TimeSlotIdentifier } from "src/routes/types/types";
+import { AuthGuard } from "@nestjs/passport";
 
 @ApiTags('Route Details')
 @Controller('routeDetail')
@@ -28,6 +29,7 @@ export class RouteDetailController {
         return this.routeDetailService.findByJobId(jobId)
     }    
 
+    @UseGuards(AuthGuard('jwt'))
     @Get('/retrieveRouteDetails/:timeSlotIdentifier')
     async retrieveRouteDetails(@Param('timeSlotIdentifier') timeSlotIdentifier: TimeSlotIdentifier){
         const jobUuid: string = uuid();

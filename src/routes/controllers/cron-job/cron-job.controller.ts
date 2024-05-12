@@ -1,4 +1,5 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, UseGuards } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
 import { CronExpression } from "@nestjs/schedule";
 import { ApiTags } from "@nestjs/swagger";
 import { CronService } from "src/routes/services/cron.service";
@@ -11,6 +12,7 @@ export class CronJobController{
         private cronService: CronService
     ){}
 
+    @UseGuards(AuthGuard('jwt'))
     @Get('/startCronJob')
     async startCronJob(){
         const cronExpressionToTimeSlotMap: CronExpresionToTimeSlotMap = {
@@ -24,11 +26,13 @@ export class CronJobController{
         return "added task scheduled every 8 hours"
     }
 
+    @UseGuards(AuthGuard('jwt'))
     @Get('/stopCronJob')
     async stopCronJob(){
         this.cronService.stopCronJob('calculaterouteDetailsInformation');
     }
 
+    @UseGuards(AuthGuard('jwt'))
     @Get('/stopAllCronJobs')
     async stopAllCronJobs(){
         this.cronService.stopAllCronJob();
