@@ -8,7 +8,8 @@ export class MailService{
     sendMail(message: string, subject: string){
         this.mailerService.sendMail({
             from: 'Routes Mapper API',
-            to: process.env.LOG_EMAIL_ADDRESS,
+            //to: process.env.LOG_EMAIL_ADDRESS,
+            to: "vinceomas@hotmail.it",
             subject,
             text: message
         }).then((res) => {

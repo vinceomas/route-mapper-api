@@ -200,7 +200,8 @@ export class RouteDetailService {
                         lng: Number(route.destinationLongitude)
                     },
                     alternatives: true,
-                    key: this.configService.get<string>('GOOGLE_MAPS_API_KEY'),
+                    //key: this.configService.get<string>('GOOGLE_MAPS_API_KEY'),
+                    key: "AIzaSyCa2jbjuPvveaNLvXeOVf0uEPkCw2rb8Lo"
                 },
                 timeout: 3000, // milliseconds
             });
