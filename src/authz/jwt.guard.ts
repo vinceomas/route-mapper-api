@@ -14,10 +14,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     handleRequest(err, user, info) {
         console.warn('AUTH0_ISSUER_URL', process.env.AUTH0_ISSUER_URL)
         console.warn('AUTH0_AUDIENCE', this.configService.get<string>('AUTH0_AUDIENCE'))
-        this.logger.error(err);
-        this.logger.error(info)
+
+        this.logger.warn(info)
         
         if (err || !user) {
+            this.logger.error(err);
             throw err || new UnauthorizedException();
         }
         return user;
