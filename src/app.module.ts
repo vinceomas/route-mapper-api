@@ -11,6 +11,10 @@ import { MailerModule } from '@nestjs-modules/mailer';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      envFilePath: '.env',
+      isGlobal: true
+    }),
     TypeOrmModule.forRoot({
       type: 'sqlite',
       autoLoadEntities: true,
@@ -19,10 +23,6 @@ import { MailerModule } from '@nestjs-modules/mailer';
     }),
     RoutesModule,
     ScheduleModule.forRoot(),
-    ConfigModule.forRoot({
-      envFilePath: '.env',
-      isGlobal: true
-    }),
     AuthzModule,
     MailerModule.forRoot({
       transport: {
