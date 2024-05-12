@@ -10,6 +10,7 @@ import { RouteService } from "./route.service";
 import { Logger } from "@nestjs/common";
 import { WorkSheet, read, utils, write } from 'xlsx';
 import { TimeSlotIdentifier } from "../types/types";
+import { MailService } from "./mail.service";
 
 export class RouteDetailService {
     public constructor(
@@ -18,6 +19,7 @@ export class RouteDetailService {
         private readonly configService: ConfigService,
         private readonly routeService: RouteService,
         private readonly logger: Logger,
+        private readonly mailService: MailService
     ){}
 
     public async findAll(): Promise<RouteDetailDto[]>{
@@ -98,6 +100,10 @@ export class RouteDetailService {
 
         await Promise.all(insertOperations).then(insertOperationResults => {
             const routesDetailAdded = insertOperationResults.reduce((acc, insertResult) => acc + insertResult.generatedMaps.length, 0)
+            this.mailService.sendMail(
+                `L'operazione di recupero informazioni sui percorsi è terminata il ${new Date()} sono stati inseriti ${routesDetailAdded} nuovi dettagli con jobId: ${jobId}`,
+                'OPERAZIONE DI RECUPERO INFO PERCORSI TERMINATA'
+            )
             this.logger.log(`PERCORSI AGGIUNTI: ${routesDetailAdded}`)
         })
     }
