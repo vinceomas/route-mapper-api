@@ -4,13 +4,15 @@ import { RouteDetailMapperService } from "./route-detail-mapper/route-detail-map
 import { InjectRepository } from "@nestjs/typeorm";
 import { RouteDetailDto } from "../entities/route-detail/route-detail.dto";
 import { Route } from "../entities/route/route";
-import { Client, DirectionsResponse, DirectionsRoute } from "@googlemaps/google-maps-services-js";
+import { AddressType, Client, DirectionsResponse, DirectionsRoute, GeocodedWaypointStatus, LatLngLiteral, Status, Time } from "@googlemaps/google-maps-services-js";
 import { ConfigService } from "@nestjs/config";
 import { RouteService } from "./route.service";
 import { Logger } from "@nestjs/common";
 import { WorkSheet, read, utils, write } from 'xlsx';
 import { TimeSlotIdentifier } from "../types/types";
 import { MailService } from "./mail.service";
+import { directions } from "@googlemaps/google-maps-services-js/dist/directions";
+import { AxiosHeaders } from "axios";
 
 export class RouteDetailService {
     public constructor(
@@ -71,43 +73,72 @@ export class RouteDetailService {
     }
 
     public async getAllRouteDetails(jobId: string, timeSlotIdentifier: TimeSlotIdentifier){
-        let routesDetailToAdd: Partial<RouteDetail>[][] = [];
-        let matrixRow: Partial<RouteDetail>[] = [];
-        const routes = await this.routeService.findAll();
-        let index = 0;
-        for(const route of routes){
-            if ((index + 1) % 1000 === 0){
-                this.logger.log(`CALCOLO DELLA ROUTE ${index}`);
+        let routeMatrix: Route[][] = [];
+        let routeMatrixRow: Route[] = [];
+        let totalAddedRouteDetail = 0;
+
+        let directionResponseByRouteIdMap: {[id: number]: number} = {}
+        const routeArray = await this.routeService.findAll();
+
+        //Dividi le route in in pacchetti di 200 elementi 
+        for(const route of routeArray){
+            routeMatrixRow.push(route);
+            if(routeMatrixRow.length > 2000){
+                routeMatrix.push(routeMatrixRow);
+                routeMatrixRow = [];
             }
-            index = index + 1;
-            const routeDetail = await this.getRouteDetail(route, jobId, timeSlotIdentifier);
-            matrixRow.push(routeDetail);
-            if(matrixRow.length > 2000){
-                routesDetailToAdd.push(matrixRow);
-                matrixRow = [];
-            }
-            //await this.add(routeDetail);
         }
-        if(matrixRow.length > 0){
-            routesDetailToAdd.push(matrixRow);
-            matrixRow = [];
+        if(routeMatrixRow.length > 0){
+            routeMatrix.push(routeMatrixRow);
+            routeMatrixRow = [];
         }
 
-        const insertOperations: Promise<InsertResult>[] = routesDetailToAdd.map((routesToAdd, index) => {
-            this.logger.log(`Inserimento della trance: ${index}`)
-            return this.routeDetailRepository.insert(routesToAdd as Route[]);
-        })
+        console.log(`Le route sono state divise in ${routeMatrix.length} trance`);
 
-        await Promise.all(insertOperations).then(insertOperationResults => {
-            const routesDetailAdded = insertOperationResults.reduce((acc, insertResult) => acc + insertResult.generatedMaps.length, 0)
-            this.mailService.sendMail(
-                `L'operazione di recupero informazioni sui percorsi è terminata il ${new Date()} sono stati inseriti ${routesDetailAdded} nuovi dettagli con jobId: ${jobId}`,
-                'OPERAZIONE DI RECUPERO INFO PERCORSI TERMINATA'
-            )
-            this.logger.log(`PERCORSI AGGIUNTI: ${routesDetailAdded}`)
-        })
+        let iterationIndex = 0;
+        for(const matrixRow of routeMatrix){
+            const rowPromises = matrixRow.map((route, index) => {
+                directionResponseByRouteIdMap[index] = route.arcId;
+                return this.getRouteDetail(route, jobId, timeSlotIdentifier)
+            });
+            let routesToAdd: Partial<RouteDetail>[] = [];
+            await Promise.all(rowPromises).then(directionsResponse => {
+                routesToAdd = directionsResponse.map((dir, index) => {
+                    const routeWithLowestTime: DirectionsRoute = dir.data.routes.reduce((acc, cur) => {
+                        return cur.legs[0].duration.value < acc.legs[0].duration.value ? cur : acc;
+                    }, dir.data.routes[0]);
+                    return {
+                        arcId: directionResponseByRouteIdMap[index],
+                        jobId: jobId,
+                        date: new Date(),
+                        distanceText: routeWithLowestTime.legs[0].distance.text,
+                        distanceValue: routeWithLowestTime.legs[0].distance.value,
+                        durationText: routeWithLowestTime.legs[0].duration.text,
+                        durationValue: routeWithLowestTime.legs[0].duration.value,
+                        timeSlotIdentifier
+                    }
+                });
+            })
+
+            const insertOperations = this.routeDetailRepository.insert(routesToAdd);
+
+            await insertOperations.then(insertResult => {
+                console.log(`Inserimento della trance: ${iterationIndex}, sono stati inseriti ${insertResult.generatedMaps.length} elementi`);
+                totalAddedRouteDetail = totalAddedRouteDetail + insertResult.generatedMaps.length;
+            })                
+            iterationIndex = iterationIndex + 1;
+        }
+
+        this.mailService.sendMail(
+            `L'operazione di recupero informazioni sui percorsi è terminata il ${new Date()} sono stati inseriti ${totalAddedRouteDetail} nuovi dettagli con jobId: ${jobId}`,
+            'OPERAZIONE DI RECUPERO INFO PERCORSI TERMINATA'
+        )
+        this.logger.log(`PERCORSI AGGIUNTI: ${totalAddedRouteDetail}`)
+
     }
 
+    //TODO: è molto lento 
+    //TODO 2: occorre ordinare le righe 
     public async getRouteWithDetailsCsv(fromDate: Date, toDate: Date){
         // Creazione del workbook
         let data = [
@@ -127,7 +158,13 @@ export class RouteDetailService {
         ];
 
         const routes = await this.routeService.findAll();
+        console.log('Route recuperate', routes.length);
+        let index = 0;
         for(const route of routes){
+            if((index + 1) % 1000 === 0){
+                console.log('sono state processate ', index )
+            }
+            index = index + 1;
             //Recupero tutti i dettagli di una determinata route 
             await this.findByDateAndId(fromDate, toDate, route.arcId).then(routeDetails => {
                 //Eseguo la media del tempo e delle distanze 
@@ -167,7 +204,6 @@ export class RouteDetailService {
         let averages: {[id: number]: {averageDuration: number; averageDistance: number}} = {};
         for (const key of Object.values(TimeSlotIdentifier)) {
             if(!isNaN(Number(key))){
-                console.log(key);
                 const routeDetailOfCurrentTimeSlot = routeDetail.filter(routeDetail => routeDetail.timeSlotIdentifier == key)
                 const { totalDistance, totalDuration } = routeDetailOfCurrentTimeSlot.reduce((acc, route) => {
                     acc.totalDistance += route.distanceValue;
@@ -185,49 +221,123 @@ export class RouteDetailService {
 
       }
 
-    private async getRouteDetail(route: Route, jobId: string, timeSlotIdentifier: TimeSlotIdentifier): Promise<Partial<RouteDetail>>{
-        const client = new Client({});
+    private async getRouteDetail(route: Route, jobId: string, timeSlotIdentifier: TimeSlotIdentifier): Promise<DirectionsResponse>{
+        //Simulate Google Maps directions API response 
+        return {
+            status: 200,
+            statusText: "",
+            headers: new AxiosHeaders(),
+            config: {
+                headers: new AxiosHeaders()
+            },
+            data: {
+                geocoded_waypoints : [
+                    {
+                       geocoder_status : GeocodedWaypointStatus.OK,
+                       place_id : "ChIJRVY_etDX3IARGYLVpoq7f68",
+                       types : [
+                        AddressType.bus_station,
+                        AddressType.train_station,
+                        AddressType.point_of_interest,
+                        AddressType.establishment
+                       ],
+                       partial_match: false
+                    },
+                    {
+                       geocoder_status : GeocodedWaypointStatus.OK,
+                       partial_match : true,
+                       place_id : "ChIJp2Mn4E2-woARQS2FILlxUzk",
+                       types : [ AddressType.route ]
+                    }
+                 ],
+                 routes : [
+                    {
+                       bounds : {
+                          northeast : {
+                             lat : 34.1330949,
+                             lng : -117.9143879
+                          },
+                          southwest : {
+                             lat : 33.8068768,
+                             lng : -118.3527671
+                          }
+                       },
+                       copyrights : "Map data ©2016 Google",
+                       legs : [
+                          {
+                             distance : {
+                                text : "35.9 mi",
+                                value : 57824
+                             },
+                             duration : {
+                                text : "51 mins",
+                                value : 3062
+                             },
+                             end_address : "Universal Studios Blvd, Los Angeles, CA 90068, USA",
+                             end_location : {
+                                lat : 34.1330949,
+                                lng : -118.3524442
+                             },
+                             start_address : "Disneyland (Harbor Blvd.), S Harbor Blvd, Anaheim, CA 92802, USA",
+                             start_location : {
+                                lat : 33.8098177,
+                                lng : -117.9154353
+                             },
+                             steps: [],
+                             departure_time: {
+                                value: new Date(),
+                                text: "string",
+                                time_zone: "string"
+                             },
+                             arrival_time: {
+                                value: new Date(),
+                                text: "string",
+                                time_zone: "string"
+                             },
 
-        try {
-            const directionResponse = await client.directions({
-                params: {
-                    origin: {
-                        lat: Number(route.originLatitude),
-                        lng: Number(route.originLongitude)
-                    },
-                    destination: {
-                        lat: Number(route.destinationLatitude),
-                        lng: Number(route.destinationLongitude)
-                    },
-                    alternatives: true,
-                    //key: this.configService.get<string>('GOOGLE_MAPS_API_KEY'),
-                    key: "AIzaSyCa2jbjuPvveaNLvXeOVf0uEPkCw2rb8Lo"
-                },
-                timeout: 3000, // milliseconds
-            });
-    
-            const routeWithLowestTime: DirectionsRoute = directionResponse.data.routes.reduce((acc, cur) => {
-                return cur.legs[0].duration.value < acc.legs[0].duration.value ? cur : acc;
-            }, directionResponse.data.routes[0]);
-    
-            const routeDetail: Partial<RouteDetail> = {
-                arcId: route.arcId,
-                jobId: jobId,
-                date: new Date(),
-                distanceText: routeWithLowestTime.legs[0].distance.text,
-                distanceValue: routeWithLowestTime.legs[0].distance.value,
-                durationText: routeWithLowestTime.legs[0].duration.text,
-                durationValue: routeWithLowestTime.legs[0].duration.value,
-                timeSlotIdentifier
-            };
-    
-            //console.log('Elaborata la route con arcId', route.arcId);
-            return routeDetail;
-        } catch (err) {
-            this.logger.error('ERRORE DURANTE IL PROCESSO DELLA ROUTE:');
-            this.logger.error(err)
-            throw err; // Rilancia l'errore per gestirlo esternamente, se necessario
+                         }
+                        ],    
+          
+                       overview_polyline : {
+                          points : "knjmEnjunUbKCfEA?"
+                       },
+                       summary : "I-5 N and US-101 N",
+                       warnings : [],
+                       waypoint_order : [],
+                       fare: {
+                            currency: "string",
+                            /** The total fare amount, in the currency specified above. */
+                            value: 1,
+                            /** The total fare amount, formatted in the requested language. */
+                            text: ""
+                        },
+                     overview_path: [] as LatLngLiteral[]
+                    }
+                 ],
+                 status : Status.OK,
+                 error_message: "",
+                 available_travel_modes: []
+            },
+
         }
+        // const client = new Client({});
+
+        // return client.directions({
+        //     params: {
+        //         origin: {
+        //             lat: Number(route.originLatitude),
+        //             lng: Number(route.originLongitude)
+        //         },
+        //         destination: {
+        //             lat: Number(route.destinationLatitude),
+        //             lng: Number(route.destinationLongitude)
+        //         },
+        //         alternatives: true,
+        //         //key: this.configService.get<string>('GOOGLE_MAPS_API_KEY'),
+        //         key: "AIzaSyCa2jbjuPvveaNLvXeOVf0uEPkCw2rb8Lo"
+        //     },
+        //     timeout: 3000, // milliseconds
+        // });
     }
 
 

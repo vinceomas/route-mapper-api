@@ -36,39 +36,7 @@ export type CsvRoute = {
     tempoFasciaOraria3: number | undefined,
 }
 
-export async function uploadFileWithInfo(file: any, body: ReqBodyDto, routeService: RouteService, eraseOldRoutesData: boolean) {
-    const logger = new Logger('UploadFileWithInfo');
-    if(eraseOldRoutesData){
-        await routeService.deleteAllRoutes().then(deletedRoutes => logger.log(`SONO STATI CANCELLATI ${deletedRoutes} PERCORSI`));        
-    }
-    const wb = read(file.buffer);
-    const csvRoutes: CsvRoute[] = utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-    logger.log(`Numero di righe nel file CSV ${csvRoutes.length}`)
-    /**
-     * Per velocizzare l'inserimento uso la bulkInsert di SQL 
-     * SQLlite ha un limite di variabili che possono essere passate a una query SQL quindi non posso creare un'unica insert con tutte le righe del CSV
-     * Per risolvere il problema suddivido l'array in una matrice, ogni elemento della matrice contiene un array di massimo 2000 operazioni 
-     * in questo modo l'insert è motlo più veloce 
-     */
-    const routesToAdd = getRouteToAdd(csvRoutes);
-    
-
-    const insertOperations: Promise<InsertResult>[] = routesToAdd.map((routesToAdd, index) => {
-        logger.log(`Inserimento della trance: ${index}`)
-        return routeService.addMany(routesToAdd as Route[]);
-    })
-    
-
-    await Promise.all(insertOperations).then(insertOperationResults => {
-        const routesAdded = insertOperationResults.reduce((acc, insertResult) => acc + insertResult.generatedMaps.length, 0)
-        const { originalname, filename: sourceFileName } = file;
-        const { chunkSize = 100 } = body;
-        logger.log(originalname, sourceFileName, chunkSize);
-        logger.log(`PERCORSI AGGIUNTI: ${routesAdded}`)
-    })
-  }
-
-  function getRouteToAdd(csvRoutes: CsvRoute[]): Route[][]{
+  export function getRouteToAdd(csvRoutes: CsvRoute[]): Route[][]{
     const logger = new Logger('GetRouteToAdd');
     let addedRoutes = 0;
     let notAddedRoutes = 0;

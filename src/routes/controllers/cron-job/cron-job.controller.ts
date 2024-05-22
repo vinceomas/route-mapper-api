@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { CronExpression } from "@nestjs/schedule";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
@@ -14,7 +14,7 @@ export class CronJobController{
 
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('/startCronJob')
+    @Get('/start')
     async startCronJob(){
         const cronExpressionToTimeSlotMap: CronExpresionToTimeSlotMap = {
             [TimeSlotIdentifier.SEVEN_TO_NINE_AM]: CronExpression.EVERY_DAY_AT_7AM,
@@ -29,9 +29,13 @@ export class CronJobController{
 
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('/stopCronJob')
-    async stopCronJob(){
-        this.cronService.stopCronJob('calculaterouteDetailsInformation');
+    @Get('/stop/:jobName')
+    async stopCronJob(@Param('jobName') jobName: string | undefined){
+        if(jobName){
+            this.cronService.stopCronJob(jobName);
+        }else{
+            this.cronService.stopAllCronJob();
+        }
     }
 
     @ApiBearerAuth()

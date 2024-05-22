@@ -8,7 +8,7 @@ import { EditRouteDto } from 'src/routes/entities/route/edit-route.dto';
 import { RouteDto } from 'src/routes/entities/route/route.dto';
 import { RouteService } from 'src/routes/services/route.service';
 import { CronService } from 'src/routes/services/cron.service';
-import { SUPPORTED_FILES, multerOptions, uploadFileWithInfo } from './csv-parser.utils';
+import { SUPPORTED_FILES, multerOptions } from './csv-parser.utils';
 import { JwtAuthGuard } from 'src/authz/jwt.guard';
 
 export class ReqBodyDto {
@@ -98,7 +98,7 @@ export class RouteController {
             );
         }
         this.logger.log('FILE VALIDO');
-        return uploadFileWithInfo(file, body, this.routeService, body.eraseOldRoutesData);
+        return this.routeService.extractRoutesFromCsvDataSheet(file, body, this.routeService, body.eraseOldRoutesData);
     }
 
 
