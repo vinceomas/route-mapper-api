@@ -12,14 +12,16 @@ import { RouteDetail } from './entities/route-detail/route-detail';
 import { RouteDetailController } from './controllers/route-detail/route-detail.controller';
 import { CronJobController } from './controllers/cron-job/cron-job.controller';
 import { MailService } from './services/mail.service';
+import { TestController } from './controllers/tests/tests.controller';
+import { TestService } from './services/test.service';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([Route, RouteDetail]),
         HttpModule
     ],
-    providers: [RouteMapperService, RouteService, CronService, RouteDetailService, RouteDetailMapperService, MailService, Logger],
-    controllers: [RouteController, RouteDetailController, CronJobController]
+    providers: [RouteMapperService, RouteService, CronService, RouteDetailService, RouteDetailMapperService, MailService, Logger, TestService],
+    controllers: [RouteController, RouteDetailController, CronJobController, TestController]
 })
 export class RoutesModule {}
 

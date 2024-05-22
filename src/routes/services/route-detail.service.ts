@@ -78,7 +78,7 @@ export class RouteDetailService {
         let totalAddedRouteDetail = 0;
 
         let directionResponseByRouteIdMap: {[id: number]: number} = {}
-        const routeArray = await this.routeService.findAll();
+        const routeArray = await this.routeService.findAllActivedRoutes();
 
         //Dividi le route in in pacchetti di 200 elementi 
         for(const route of routeArray){

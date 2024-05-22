@@ -3,17 +3,10 @@ import { Route } from "../entities/route/route";
 import { RouteMapperService } from "./route-mapper/route-mapper.service";
 import { InjectRepository } from "@nestjs/typeorm";
 import { RouteDto } from "../entities/route/route.dto";
-import { InsertResult, LessThanOrEqual, MoreThanOrEqual, Repository } from "typeorm";
+import { InsertResult, Repository } from "typeorm";
 import { isNullOrUndefined } from "util";
 import { AddRouteDto } from "../entities/route/add-route.dto";
 import { EditRouteDto } from "../entities/route/edit-route.dto";
-import { HttpService } from "@nestjs/axios";
-import { map } from "rxjs";
-import { AxiosRequestConfig } from "axios";
-import { Client, DirectionsResponseData, DirectionsRoute } from "@googlemaps/google-maps-services-js";
-import { RouteDetailService } from "./route-detail.service";
-import { ConfigService } from "@nestjs/config";
-import { RouteDetail } from "../entities/route-detail/route-detail";
 import { read, utils } from "xlsx";
 import { CsvRoute, getRouteToAdd as getRouteFromCsvRoute } from "../controllers/route/csv-parser.utils";
 import { ReqBodyDto } from "../controllers/route/route.controller";
@@ -29,6 +22,11 @@ export class RouteService {
     public async findAll(): Promise<RouteDto[]>{
         const routes = await this.routeRepository.find();
         return routes.map(this.routeMapper.modelRouteDto)
+    }
+
+    public async findAllActivedRoutes(): Promise<RouteDto[]>{
+        const activedRoutes = await this.routeRepository.find({where: {enabled: true}});
+        return activedRoutes.map(this.routeMapper.modelRouteDto)
     }
 
     public async findOne(id: number): Promise<RouteDto>{
