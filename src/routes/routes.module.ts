@@ -14,13 +14,14 @@ import { CronJobController } from './controllers/cron-job/cron-job.controller';
 import { MailService } from './services/mail.service';
 import { TestController } from './controllers/tests/tests.controller';
 import { TestService } from './services/test.service';
+import { GoogleMapsApiHandler } from './services/google-maps-api-handler.service';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([Route, RouteDetail]),
         HttpModule
     ],
-    providers: [RouteMapperService, RouteService, CronService, RouteDetailService, RouteDetailMapperService, MailService, Logger, TestService],
+    providers: [RouteMapperService, RouteService, CronService, RouteDetailService, RouteDetailMapperService, MailService, Logger, TestService, GoogleMapsApiHandler],
     controllers: [RouteController, RouteDetailController, CronJobController, TestController]
 })
 export class RoutesModule {}

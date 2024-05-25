@@ -4,16 +4,19 @@ import { RouteDetailMapperService } from "./route-detail-mapper/route-detail-map
 import { InjectRepository } from "@nestjs/typeorm";
 import { RouteDetailDto } from "../entities/route-detail/route-detail.dto";
 import { Route } from "../entities/route/route";
-import { AddressType, Client, DirectionsResponse, DirectionsRoute, GeocodedWaypointStatus, LatLngLiteral, Status, Time } from "@googlemaps/google-maps-services-js";
+import { AddressType, Client, DirectionsResponse, DirectionsRoute, GeocodedWaypointStatus, LatLngLiteral, Status, Time, TravelMode } from "@googlemaps/google-maps-services-js";
 import { ConfigService } from "@nestjs/config";
 import { RouteService } from "./route.service";
-import { Logger } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { WorkSheet, read, utils, write } from 'xlsx';
 import { TimeSlotIdentifier } from "../types/types";
 import { MailService } from "./mail.service";
 import { directions } from "@googlemaps/google-maps-services-js/dist/directions";
 import { AxiosHeaders } from "axios";
+import { RoutesClient } from "@googlemaps/routing/build/src/v2";
+import { GoogleMapsApiHandler } from "./google-maps-api-handler.service";
 
+@Injectable()
 export class RouteDetailService {
     public constructor(
         @InjectRepository(RouteDetail) private readonly routeDetailRepository: Repository<RouteDetail>,
@@ -21,7 +24,8 @@ export class RouteDetailService {
         private readonly configService: ConfigService,
         private readonly routeService: RouteService,
         private readonly logger: Logger,
-        private readonly mailService: MailService
+        private readonly mailService: MailService,
+        private readonly googleMapsApiHandler: GoogleMapsApiHandler
     ){}
 
     public async findAll(): Promise<RouteDetailDto[]>{
@@ -40,21 +44,6 @@ export class RouteDetailService {
     }
 
     public async findByDateAndId(fromDate: Date, toDate: Date, arcId: number): Promise<RouteDetailDto[]>{
-        // const routeDetails = await this.routeDetailRepository.find({
-        //     where: [
-        //         {
-        //             arcId: arcId
-        //         },
-        //         {                
-        //             date: LessThanOrEqual(toDate)
-        //         },
-        //         {
-        //             date: MoreThanOrEqual(fromDate)
-        //         }
-        //     ],
-
-        // })
-
         const routeDetails = await this.routeDetailRepository
             .createQueryBuilder('entity')
             .where('entity.arcId = :arcId', { arcId })
@@ -62,12 +51,10 @@ export class RouteDetailService {
             .getMany();
 
         return routeDetails.map(this.routeDetailMapper.modelRouteDetailDto);
-
-
     }
 
     public async add(routeDetail: Partial<RouteDetail>): Promise<RouteDetail>{
-        let currentRouteDetail = new RouteDetail(routeDetail.arcId, routeDetail.jobId, routeDetail.date, routeDetail.distanceText, routeDetail.distanceValue, routeDetail.durationText, routeDetail.durationValue, routeDetail.timeSlotIdentifier);
+        let currentRouteDetail = new RouteDetail(routeDetail.arcId, routeDetail.jobId, routeDetail.date, routeDetail.distanceText, routeDetail.distanceValue, routeDetail.durationText, routeDetail.durationValue, routeDetail.staticDurationText, routeDetail.staticDurationValue, routeDetail.googleMapsPolyline, routeDetail.timeSlotIdentifier);
         currentRouteDetail = await this.routeDetailRepository.save(currentRouteDetail);
         return this.routeDetailMapper.modelRouteDetailDto(currentRouteDetail);
     }
@@ -80,7 +67,9 @@ export class RouteDetailService {
         let directionResponseByRouteIdMap: {[id: number]: number} = {}
         const routeArray = await this.routeService.findAllActivedRoutes();
 
-        //Dividi le route in in pacchetti di 200 elementi 
+        const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+        //Dividi le route in in pacchetti di 2000 elementi 
         for(const route of routeArray){
             routeMatrixRow.push(route);
             if(routeMatrixRow.length > 2000){
@@ -99,26 +88,51 @@ export class RouteDetailService {
         for(const matrixRow of routeMatrix){
             const rowPromises = matrixRow.map((route, index) => {
                 directionResponseByRouteIdMap[index] = route.arcId;
-                return this.getRouteDetail(route, jobId, timeSlotIdentifier)
+                //const routeApiResponse = this.getDirectionsDetail(route, jobId, timeSlotIdentifier)
+                return this.googleMapsApiHandler.getRouteDetails(route);
+                //return this.googleMapsApiHandler.getFakeRouteDetails(route);
             });
             let routesToAdd: Partial<RouteDetail>[] = [];
             await Promise.all(rowPromises).then(directionsResponse => {
                 routesToAdd = directionsResponse.map((dir, index) => {
-                    const routeWithLowestTime: DirectionsRoute = dir.data.routes.reduce((acc, cur) => {
-                        return cur.legs[0].duration.value < acc.legs[0].duration.value ? cur : acc;
-                    }, dir.data.routes[0]);
+                    this.logger.verbose(`Route API Response: ${JSON.stringify(dir)}`);
+                    // const routeWithLowestTime: DirectionsRoute = dir.data.routes.reduce((acc, cur) => {
+                    //     return cur.legs[0].duration.value < acc.legs[0].duration.value ? cur : acc;
+                    // }, dir.data.routes[0]);
+                    // return {
+                    //     arcId: directionResponseByRouteIdMap[index],
+                    //     jobId: jobId,
+                    //     date: new Date(),
+                    //     distanceText: routeWithLowestTime.legs[0].distance.text,
+                    //     distanceValue: routeWithLowestTime.legs[0].distance.value,
+                    //     durationText: routeWithLowestTime.legs[0].duration.text,
+                    //     durationValue: routeWithLowestTime.legs[0].duration.value,
+                    //     timeSlotIdentifier
+                    // }
+                    if(isNaN(dir[0].routes[0].duration.seconds as number))
+                        this.logger.error(`IsNan duration value for route with arcId: ${directionResponseByRouteIdMap[index]}`)
+                    if(isNaN(dir[0].routes[0].staticDuration.seconds as number))
+                        this.logger.error(`IsNan staticDuration value for route with arcId: ${directionResponseByRouteIdMap[index]}`)
                     return {
                         arcId: directionResponseByRouteIdMap[index],
                         jobId: jobId,
                         date: new Date(),
-                        distanceText: routeWithLowestTime.legs[0].distance.text,
-                        distanceValue: routeWithLowestTime.legs[0].distance.value,
-                        durationText: routeWithLowestTime.legs[0].duration.text,
-                        durationValue: routeWithLowestTime.legs[0].duration.value,
+                        distanceText: dir[0].routes[0].localizedValues.distance.text,
+                        distanceValue: dir[0].routes[0].distanceMeters,
+                        durationText: dir[0].routes[0].localizedValues.duration.text,
+                        durationValue:dir[0].routes[0].duration.seconds as number,
+                        staticDurationText: dir[0].routes[0].localizedValues.staticDuration.text,
+                        staticDurationValue: dir[0].routes[0].staticDuration.seconds as number,
+                        googleMapsPolyline: dir[0].routes[0].polyline.encodedPolyline,
                         timeSlotIdentifier
                     }
                 });
+            }).catch(err => {
+                console.log('err', err)
+                this.logger.error(`Error during fetch trance ${iterationIndex}: ${err}`)
             })
+
+            await wait(60000)
 
             const insertOperations = this.routeDetailRepository.insert(routesToAdd);
 
@@ -220,127 +234,4 @@ export class RouteDetailService {
         return averages
 
       }
-
-    private async getRouteDetail(route: Route, jobId: string, timeSlotIdentifier: TimeSlotIdentifier): Promise<DirectionsResponse>{
-        //Simulate Google Maps directions API response 
-        return {
-            status: 200,
-            statusText: "",
-            headers: new AxiosHeaders(),
-            config: {
-                headers: new AxiosHeaders()
-            },
-            data: {
-                geocoded_waypoints : [
-                    {
-                       geocoder_status : GeocodedWaypointStatus.OK,
-                       place_id : "ChIJRVY_etDX3IARGYLVpoq7f68",
-                       types : [
-                        AddressType.bus_station,
-                        AddressType.train_station,
-                        AddressType.point_of_interest,
-                        AddressType.establishment
-                       ],
-                       partial_match: false
-                    },
-                    {
-                       geocoder_status : GeocodedWaypointStatus.OK,
-                       partial_match : true,
-                       place_id : "ChIJp2Mn4E2-woARQS2FILlxUzk",
-                       types : [ AddressType.route ]
-                    }
-                 ],
-                 routes : [
-                    {
-                       bounds : {
-                          northeast : {
-                             lat : 34.1330949,
-                             lng : -117.9143879
-                          },
-                          southwest : {
-                             lat : 33.8068768,
-                             lng : -118.3527671
-                          }
-                       },
-                       copyrights : "Map data ©2016 Google",
-                       legs : [
-                          {
-                             distance : {
-                                text : "35.9 mi",
-                                value : 57824
-                             },
-                             duration : {
-                                text : "51 mins",
-                                value : 3062
-                             },
-                             end_address : "Universal Studios Blvd, Los Angeles, CA 90068, USA",
-                             end_location : {
-                                lat : 34.1330949,
-                                lng : -118.3524442
-                             },
-                             start_address : "Disneyland (Harbor Blvd.), S Harbor Blvd, Anaheim, CA 92802, USA",
-                             start_location : {
-                                lat : 33.8098177,
-                                lng : -117.9154353
-                             },
-                             steps: [],
-                             departure_time: {
-                                value: new Date(),
-                                text: "string",
-                                time_zone: "string"
-                             },
-                             arrival_time: {
-                                value: new Date(),
-                                text: "string",
-                                time_zone: "string"
-                             },
-
-                         }
-                        ],    
-          
-                       overview_polyline : {
-                          points : "knjmEnjunUbKCfEA?"
-                       },
-                       summary : "I-5 N and US-101 N",
-                       warnings : [],
-                       waypoint_order : [],
-                       fare: {
-                            currency: "string",
-                            /** The total fare amount, in the currency specified above. */
-                            value: 1,
-                            /** The total fare amount, formatted in the requested language. */
-                            text: ""
-                        },
-                     overview_path: [] as LatLngLiteral[]
-                    }
-                 ],
-                 status : Status.OK,
-                 error_message: "",
-                 available_travel_modes: []
-            },
-
-        }
-        // const client = new Client({});
-
-        // return client.directions({
-        //     params: {
-        //         origin: {
-        //             lat: Number(route.originLatitude),
-        //             lng: Number(route.originLongitude)
-        //         },
-        //         destination: {
-        //             lat: Number(route.destinationLatitude),
-        //             lng: Number(route.destinationLongitude)
-        //         },
-        //         alternatives: true,
-        //         //key: this.configService.get<string>('GOOGLE_MAPS_API_KEY'),
-        //         key: "AIzaSyCa2jbjuPvveaNLvXeOVf0uEPkCw2rb8Lo"
-        //     },
-        //     timeout: 3000, // milliseconds
-        // });
-    }
-
-
-
-
 }
