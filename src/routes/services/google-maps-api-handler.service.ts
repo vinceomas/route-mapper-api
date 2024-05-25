@@ -169,7 +169,7 @@ export class GoogleMapsApiHandler {
         })
     }
 
-    public async getFakeRouteDetails(route: Route){
+    public async getFakeRouteDetails(route: Route, arcId: number, timeSlot: number){
         return[
             {
                 routes: [
@@ -199,7 +199,7 @@ export class GoogleMapsApiHandler {
                         travelAdvisory: null,
                         localizedValues: {
                             distance: {
-                                text: "221 km",
+                                text: `ArcId: ${arcId}, timeSlot: ${timeSlot}`,
                                 languageCode: ""
                             },
                             duration: {

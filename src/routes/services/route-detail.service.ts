@@ -1,19 +1,15 @@
-import { InsertResult, LessThanOrEqual, MoreThanOrEqual, Repository } from "typeorm";
+import { Repository } from "typeorm";
 import { RouteDetail } from "../entities/route-detail/route-detail";
 import { RouteDetailMapperService } from "./route-detail-mapper/route-detail-mapper.service";
 import { InjectRepository } from "@nestjs/typeorm";
 import { RouteDetailDto } from "../entities/route-detail/route-detail.dto";
 import { Route } from "../entities/route/route";
-import { AddressType, Client, DirectionsResponse, DirectionsRoute, GeocodedWaypointStatus, LatLngLiteral, Status, Time, TravelMode } from "@googlemaps/google-maps-services-js";
 import { ConfigService } from "@nestjs/config";
 import { RouteService } from "./route.service";
 import { Injectable, Logger } from "@nestjs/common";
-import { WorkSheet, read, utils, write } from 'xlsx';
+import { utils, write } from 'xlsx';
 import { TimeSlotIdentifier } from "../types/types";
 import { MailService } from "./mail.service";
-import { directions } from "@googlemaps/google-maps-services-js/dist/directions";
-import { AxiosHeaders } from "axios";
-import { RoutesClient } from "@googlemaps/routing/build/src/v2";
 import { GoogleMapsApiHandler } from "./google-maps-api-handler.service";
 
 @Injectable()
@@ -53,6 +49,80 @@ export class RouteDetailService {
         return routeDetails.map(this.routeDetailMapper.modelRouteDetailDto);
     }
 
+    private async getAggregatedRoutesDetail() {
+
+        const subquery0 = this.routeDetailRepository.createQueryBuilder('rDetail0')
+        .select('rDetail0.arcId', 'arcId')
+        .addSelect('0', 'timeSlotIdentifier')
+        .addSelect('MAX(rDetail0.durationValue)', 'max_durationValue0')
+        .where('rDetail0.timeSlotIdentifier = 0')
+        .groupBy('rDetail0.arcId');
+
+        const subquery1 = this.routeDetailRepository.createQueryBuilder('rDetail1')
+        .select('rDetail1.arcId', 'arcId')
+        .addSelect('1', 'timeSlotIdentifier')
+        .addSelect('MAX(rDetail1.durationValue)', 'max_durationValue1')
+        .where('rDetail1.timeSlotIdentifier = 1')
+        .groupBy('rDetail1.arcId');
+
+        const subquery2 = this.routeDetailRepository.createQueryBuilder('rDetail2')
+        .select('rDetail2.arcId', 'arcId')
+        .addSelect('2', 'timeSlotIdentifier')
+        .addSelect('MAX(rDetail2.durationValue)', 'max_durationValue2')
+        .where('rDetail2.timeSlotIdentifier = 2')
+        .groupBy('rDetail2.arcId');
+
+        const results = await this.routeDetailRepository
+        .createQueryBuilder('rDetails')
+        .leftJoin(Route, 'r', 'rDetails.arcId = r.arcId')
+        .leftJoin(
+            `(${subquery0.getQuery()})`,
+            'sq0',
+            'rDetails.arcId = sq0.arcId'
+        )
+        .leftJoin(
+            `(${subquery1.getQuery()})`,
+            'sq1',
+            'rDetails.arcId = sq1.arcId'
+        )
+        .leftJoin(
+            `(${subquery2.getQuery()})`,
+            'sq2',
+            'rDetails.arcId = sq2.arcId'
+        )
+        .select('r.arcId', 'arcId')
+        .addSelect('r.originNodeId', 'originNodeId')
+        .addSelect('r.destinationNodeId', 'destinationNodeId')
+        .addSelect('r.originLatitude', 'originLatitude')
+        .addSelect('r.originLongitude', 'originLongitude')
+        .addSelect('r.destinationLatitude', 'destinationLatitude')
+        .addSelect('r.destinationLongitude', 'destinationLongitude')
+
+        .addSelect('sq0.max_durationValue0', 'durationValue_slot0')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.durationText ELSE NULL END)', 'durationText_slot0')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.distanceValue ELSE NULL END)', 'distanceValue_slot0')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.distanceText ELSE NULL END)', 'distanceText_slot0')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.googleMapsPolyline ELSE NULL END)', 'googleMapsPolyline_slot0')
+
+        .addSelect('sq1.max_durationValue1', 'durationValue_slot1')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.durationText ELSE NULL END)', 'durationText_slot1')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.distanceValue ELSE NULL END)', 'distanceValue_slot1')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.distanceText ELSE NULL END)', 'distanceText_slot1')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.googleMapsPolyline ELSE NULL END)', 'googleMapsPolyline_slot1')
+
+        .addSelect('sq2.max_durationValue2', 'durationValue_slot2')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.durationText ELSE NULL END)', 'durationText_slot2')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.distanceValue ELSE NULL END)', 'distanceValue_slot2')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.distanceText ELSE NULL END)', 'distanceText_slot2')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.googleMapsPolyline ELSE NULL END)', 'googleMapsPolyline_slot2')
+
+        .where('rDetails.timeSlotIdentifier IN (0, 1, 2)')
+        .groupBy('rDetails.arcId')
+        .getRawMany();
+    
+        return results;
+    }
+
     public async add(routeDetail: Partial<RouteDetail>): Promise<RouteDetail>{
         let currentRouteDetail = new RouteDetail(routeDetail.arcId, routeDetail.jobId, routeDetail.date, routeDetail.distanceText, routeDetail.distanceValue, routeDetail.durationText, routeDetail.durationValue, routeDetail.staticDurationText, routeDetail.staticDurationValue, routeDetail.googleMapsPolyline, routeDetail.timeSlotIdentifier);
         currentRouteDetail = await this.routeDetailRepository.save(currentRouteDetail);
@@ -89,8 +159,8 @@ export class RouteDetailService {
             const rowPromises = matrixRow.map((route, index) => {
                 directionResponseByRouteIdMap[index] = route.arcId;
                 //const routeApiResponse = this.getDirectionsDetail(route, jobId, timeSlotIdentifier)
-                return this.googleMapsApiHandler.getRouteDetails(route);
-                //return this.googleMapsApiHandler.getFakeRouteDetails(route);
+                //return this.googleMapsApiHandler.getRouteDetails(route);
+                return this.googleMapsApiHandler.getFakeRouteDetails(route, route.arcId, timeSlotIdentifier);
             });
             let routesToAdd: Partial<RouteDetail>[] = [];
             await Promise.all(rowPromises).then(directionsResponse => {
@@ -132,7 +202,8 @@ export class RouteDetailService {
                 this.logger.error(`Error during fetch trance ${iterationIndex}: ${err}`)
             })
 
-            await wait(60000)
+            //await wait(60000)
+            await wait(2000)
 
             const insertOperations = this.routeDetailRepository.insert(routesToAdd);
 
@@ -151,8 +222,6 @@ export class RouteDetailService {
 
     }
 
-    //TODO: è molto lento 
-    //TODO 2: occorre ordinare le righe 
     public async getRouteWithDetailsCsv(fromDate: Date, toDate: Date){
         // Creazione del workbook
         let data = [
@@ -171,36 +240,24 @@ export class RouteDetailService {
             ]
         ];
 
-        const routes = await this.routeService.findAll();
-        console.log('Route recuperate', routes.length);
-        let index = 0;
-        for(const route of routes){
-            if((index + 1) % 1000 === 0){
-                console.log('sono state processate ', index )
-            }
-            index = index + 1;
-            //Recupero tutti i dettagli di una determinata route 
-            await this.findByDateAndId(fromDate, toDate, route.arcId).then(routeDetails => {
-                //Eseguo la media del tempo e delle distanze 
-                let averages = this.calculateRouteDetailAverage(routeDetails);
-                //Stampo i irsultati nel csv
-                data.push(
-                    [
-                        route.arcId.toString(), 
-                        route.originNodeId.toString(),
-                        route.destinationNodeId.toString(),
-                        `${route.originLatitude}, ${route.originLongitude}`, 
-                        `${route.destinationLatitude}, ${route.destinationLongitude}`,
-                        averages[TimeSlotIdentifier.SEVEN_TO_NINE_AM].averageDistance.toString(),
-                        averages[TimeSlotIdentifier.NINE_TO_ELEVEN_AM].averageDistance.toString(),
-                        averages[TimeSlotIdentifier.ELEVEN_TO_TWELVE].averageDistance.toString(),
-                        averages[TimeSlotIdentifier.SEVEN_TO_NINE_AM].averageDuration.toString(),
-                        averages[TimeSlotIdentifier.NINE_TO_ELEVEN_AM].averageDuration.toString(),
-                        averages[TimeSlotIdentifier.ELEVEN_TO_TWELVE].averageDuration.toString()
-
-                    ]
-                )
-            })
+        const aggregatedRoutesDetail = await this.getAggregatedRoutesDetail();
+        console.log('Route recuperate', aggregatedRoutesDetail.length);
+        for(const routeDetail of aggregatedRoutesDetail){
+            data.push(
+                [
+                    routeDetail.arcId.toString(), 
+                    routeDetail.originNodeId.toString(),
+                    routeDetail.destinationNodeId.toString(),
+                    `${routeDetail.originLatitude}, ${routeDetail.originLongitude}`, 
+                    `${routeDetail.destinationLatitude}, ${routeDetail.destinationLongitude}`,
+                    routeDetail.distanceValue_slot0,
+                    routeDetail.distanceValue_slot1,
+                    routeDetail.distanceValue_slot2,
+                    routeDetail.durationValue_slot0,
+                    routeDetail.durationValue_slot1,
+                    routeDetail.durationValue_slot2,
+                ]
+            )
         }
 
         const workbook = utils.book_new();
@@ -232,6 +289,5 @@ export class RouteDetailService {
             }
         }
         return averages
-
-      }
+    }
 }
