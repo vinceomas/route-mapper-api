@@ -30,10 +30,6 @@ export class EditRouteDto{
     @IsNotEmpty()
     public readonly destinationLatitude: string;
 
-    @IsString()
-    @IsNotEmpty()
-    public readonly googleMapsRouteIdentifier: string | null;
-
     @IsBoolean()
     public readonly enabled: boolean;
 

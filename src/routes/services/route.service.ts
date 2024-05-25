@@ -46,7 +46,7 @@ export class RouteService {
         return await this.routeRepository.insert(routeToAdd);
     }    
 
-    public async edit(id: number, {originLatitude, originLongitude, destinationLatitude, destinationLongitude, googleMapsRouteIdentifier, enabled}: EditRouteDto): Promise<RouteDto>{
+    public async edit(id: number, {originLatitude, originLongitude, destinationLatitude, destinationLongitude, enabled}: EditRouteDto): Promise<RouteDto>{
         let route = await this.routeRepository.findOne({where: {id}})
         if(isNullOrUndefined(route))
             throw new NotFoundException();
@@ -56,7 +56,6 @@ export class RouteService {
         route.originLongitude = originLongitude;
         route.destinationLatitude = destinationLatitude;
         route.destinationLongitude = destinationLongitude;
-        route.googleMapsRouteIdentifier = googleMapsRouteIdentifier
 
         route = await this.routeRepository.save(route);
 

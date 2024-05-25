@@ -9,6 +9,9 @@ export class RouteDetailDto {
     public readonly distanceValue: number;
     public readonly durationText: string;
     public readonly durationValue: number;
+    public readonly staticDurationText: string;
+    public readonly staticDurationValue: number;
+    public readonly googleMapsPolyline: string;
     public readonly timeSlotIdentifier: TimeSlotIdentifier;
 
     public constructor(opts?: RouteDetailDto){

@@ -4,7 +4,7 @@ import { RouteDto } from 'src/routes/entities/route/route.dto';
 
 @Injectable()
 export class RouteMapperService {
-    public modelRouteDto({id, arcId, originNodeId, destinationNodeId, originLatitude, originLongitude, destinationLatitude, destinationLongitude, googleMapsRouteIdentifier, enabled}: Route){
-        return new RouteDto({id, arcId, originNodeId, destinationNodeId, originLatitude, originLongitude, destinationLatitude, destinationLongitude, googleMapsRouteIdentifier, enabled})
+    public modelRouteDto({id, arcId, originNodeId, destinationNodeId, originLatitude, originLongitude, destinationLatitude, destinationLongitude, enabled}: Route){
+        return new RouteDto({id, arcId, originNodeId, destinationNodeId, originLatitude, originLongitude, destinationLatitude, destinationLongitude, enabled})
     }
 }

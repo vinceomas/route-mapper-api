@@ -6,7 +6,6 @@ export class AddRouteDto {
     public readonly originLatitude: string;
     public readonly destinationLongitude: string;
     public readonly destinationLatitude: string;
-    public readonly googleMapsRouteIdentifier: string | null;
     
     public constructor(opts?: Partial<AddRouteDto>){
         Object.assign(this, opts)

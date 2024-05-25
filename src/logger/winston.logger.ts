@@ -11,7 +11,7 @@ const options = {
         level: 'info'
     },
     console: {
-        level: 'silly'
+        level: 'info'
     },
     colorize: true,
 }
@@ -31,7 +31,7 @@ const devLogger = {
         new transports.File(options.file),
         new transports.File({
             filename: 'combine.log',
-            level: 'info'
+            level: 'verbose'
         })
     ]
 }

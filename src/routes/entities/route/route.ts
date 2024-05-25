@@ -26,9 +26,6 @@ export class Route {
     
     @Column()
     public destinationLatitude: string;
-    
-    @Column({ nullable: true })
-    public googleMapsRouteIdentifier: string | null;
 
     @Column()
     public enabled: boolean;
@@ -41,7 +38,6 @@ export class Route {
         this.originLongitude = originLongitude;
         this.destinationLatitude = destinationLatitude;
         this.destinationLongitude = destinationLongitude;
-        this.googleMapsRouteIdentifier = null;
         this.enabled = true;
     }
 }
