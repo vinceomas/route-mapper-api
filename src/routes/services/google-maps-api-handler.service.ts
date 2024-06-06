@@ -4,6 +4,7 @@ import { AxiosHeaders } from "axios";
 import { AddressType, Client, GeocodedWaypointStatus, LatLngLiteral, Status } from "@googlemaps/google-maps-services-js";
 import { RoutesClient } from "@googlemaps/routing";
 import { google } from "@googlemaps/routing/build/protos/protos";
+import { RouteDto } from "../entities/route/route.dto";
 
 @Injectable()
 export class GoogleMapsApiHandler {
@@ -131,7 +132,7 @@ export class GoogleMapsApiHandler {
         });
     }
 
-    public async getRouteDetails(route: Route){
+    public async getRouteDetails(route: RouteDto){
         const client = new RoutesClient();
 
         const origin = {
@@ -156,7 +157,8 @@ export class GoogleMapsApiHandler {
             origin,
             destination,
             TravelMode: 1,
-            client
+            client,
+            routingPreference: 2
         }
 
         return client.computeRoutes(request, {
@@ -183,7 +185,7 @@ export class GoogleMapsApiHandler {
                         routeLabels: [],
                         distanceMeters: 220574,
                         duration: {
-                            seconds: 9249,
+                            seconds: timeSlot == 0 ? 9249 : timeSlot == 1 ? 5000 : 2000,
                             nanos: 0
                         },
                         staticDuration: {

@@ -45,9 +45,9 @@ export class RouteDetailController {
 
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('/downlodRouteDetailsCsv/:fromDate/:toDate')
-    async downloadRouteDetailsCsv(@Param('fromDate') fromDate: Date, @Param('toDate') toDate: Date, @Res() res: Response){
-        const buffer = await this.routeDetailService.getRouteWithDetailsCsv(fromDate, toDate);
+    @Get('/routeDetailsCsv')
+    async getRouteDetailsCsv(@Res() res: Response){
+        const buffer = await this.routeDetailService.getRouteDetailsCsvBuffer();
         // Invio del file al client come download
         res.set({
             'Content-Type': 'application/octet-stream',
