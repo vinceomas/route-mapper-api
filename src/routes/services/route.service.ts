@@ -94,12 +94,10 @@ export class RouteService {
          */
         const routesToAdd = getRouteFromCsvRoute(csvRoutes);
 
-
         const insertOperations: Promise<InsertResult>[] = routesToAdd.map((routesToAdd, index) => {
             logger.log(`Inserimento della trance: ${index}`)
             return routeService.addMany(routesToAdd as Route[]);
         })
-
 
         await Promise.all(insertOperations).then(insertOperationResults => {
             const routesAdded = insertOperationResults.reduce((acc, insertResult) => acc + insertResult.generatedMaps.length, 0)

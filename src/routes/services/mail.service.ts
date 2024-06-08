@@ -8,17 +8,14 @@ export class MailService{
     sendMail(message: string, subject: string){
         this.mailerService.sendMail({
             from: 'Routes Mapper API',
-            //to: process.env.LOG_EMAIL_ADDRESS,
-            to: "vinceomas@hotmail.it",
+            to: process.env.LOG_EMAIL_ADDRESS,
             subject,
             text: message
         }).then((res) => {
-            this.logger.log('MAIL INVIATA');
-            this.logger.log(res)
+            this.logger.log(`MAIL INVIATA: ${res}`);
         })
         .catch(err => {
-            this.logger.error('ERRORE INVIO MAIL')
-            this.logger.error(err)
+            this.logger.error(`ERRORE INVIO MAIL: ${err}`);
         })
     }
 }

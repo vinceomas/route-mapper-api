@@ -71,7 +71,7 @@ export type CsvRoute = {
                 destinationLatitude,
                 destinationLongitude
             ));
-            if(matrixRow.length > 2000){
+            if(matrixRow.length > Number(process.env.MASSIVE_INSERT_CHUNCK_SIZE)){
                 routesToAdd.push(matrixRow);
                 matrixRow = [];
             }

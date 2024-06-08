@@ -156,9 +156,9 @@ export class GoogleMapsApiHandler {
         const request = {
             origin,
             destination,
-            TravelMode: 1,
+            TravelMode: Number(process.env.GOOGLE_MAPS_ROUTE_API_TRAVEL_MODE),
             client,
-            routingPreference: 2
+            routingPreference: Number(process.env.GOOGLE_MAPS_ROUTE_API_ROUTING_PREFERENCE)
         }
 
         return client.computeRoutes(request, {
@@ -166,7 +166,7 @@ export class GoogleMapsApiHandler {
                 headers: {
                     "X-Goog-FieldMask": "routes.warnings,routes.distanceMeters,routes.duration,routes.staticDuration,routes.polyline,routes.localizedValues",
                 },
-                timeout: 3000
+                timeout: process.env.GOOGLE_MAPS_ROUTE_API_TIMEOUT,
             }
         })
     }

@@ -11,6 +11,7 @@ import { utils, write } from 'xlsx';
 import { TimeSlotIdentifier } from "../types/types";
 import { MailService } from "./mail.service";
 import { GoogleMapsApiHandler } from "./google-maps-api-handler.service";
+import { RouteDto } from "../entities/route/route.dto";
 
 @Injectable()
 export class RouteDetailService {
@@ -101,20 +102,20 @@ export class RouteDetailService {
         .addSelect('sq0.max_durationValue0', 'durationValue_slot0')
         .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.durationText ELSE NULL END)', 'durationText_slot0')
         .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.distanceValue ELSE NULL END)', 'distanceValue_slot0')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.distanceText ELSE NULL END)', 'distanceText_slot0')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.googleMapsPolyline ELSE NULL END)', 'googleMapsPolyline_slot0')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.staticDurationValue ELSE NULL END)', 'staticDurationValue_slot0')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.date ELSE NULL END)', 'date_slot0')
 
         .addSelect('sq1.max_durationValue1', 'durationValue_slot1')
         .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.durationText ELSE NULL END)', 'durationText_slot1')
         .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.distanceValue ELSE NULL END)', 'distanceValue_slot1')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.distanceText ELSE NULL END)', 'distanceText_slot1')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.googleMapsPolyline ELSE NULL END)', 'googleMapsPolyline_slot1')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.staticDurationValue ELSE NULL END)', 'staticDurationValue_slot1')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.date ELSE NULL END)', 'date_slot1')
 
         .addSelect('sq2.max_durationValue2', 'durationValue_slot2')
         .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.durationText ELSE NULL END)', 'durationText_slot2')
         .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.distanceValue ELSE NULL END)', 'distanceValue_slot2')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.distanceText ELSE NULL END)', 'distanceText_slot2')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.googleMapsPolyline ELSE NULL END)', 'googleMapsPolyline_slot2')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.staticDurationValue ELSE NULL END)', 'staticDurationValue_slot2')
+        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.date ELSE NULL END)', 'date_slot2')
 
         .where('rDetails.timeSlotIdentifier IN (0, 1, 2)')
         .groupBy('rDetails.arcId')
@@ -130,19 +131,19 @@ export class RouteDetailService {
     }
 
     public async getAllRouteDetails(jobId: string, timeSlotIdentifier: TimeSlotIdentifier){
-        let routeMatrix: Route[][] = [];
-        let routeMatrixRow: Route[] = [];
+        let routeMatrix: RouteDto[][] = [];
+        let routeMatrixRow: RouteDto[] = [];
         let totalAddedRouteDetail = 0;
 
         let directionResponseByRouteIdMap: {[id: number]: number} = {}
-        const routeArray = await this.routeService.findAllActivedRoutes();
+        const routeDtoArray = await this.routeService.findAllActivedRoutes();
 
         const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-        //Dividi le route in in pacchetti di 2000 elementi 
-        for(const route of routeArray){
-            routeMatrixRow.push(route);
-            if(routeMatrixRow.length > 2000){
+        //Dividi le route in in chunks
+        for(const routeDto of routeDtoArray){
+            routeMatrixRow.push(routeDto);
+            if(routeMatrixRow.length > Number(process.env.EXTRACTION_CHUNK_SIZE)){
                 routeMatrix.push(routeMatrixRow);
                 routeMatrixRow = [];
             }
@@ -159,10 +160,11 @@ export class RouteDetailService {
             const rowPromises = matrixRow.map((route, index) => {
                 directionResponseByRouteIdMap[index] = route.arcId;
                 //const routeApiResponse = this.getDirectionsDetail(route, jobId, timeSlotIdentifier)
-                //return this.googleMapsApiHandler.getRouteDetails(route);
-                return this.googleMapsApiHandler.getFakeRouteDetails(route, route.arcId, timeSlotIdentifier);
+                return this.googleMapsApiHandler.getRouteDetails(route);
+                //return this.googleMapsApiHandler.getFakeRouteDetails(route, route.arcId, timeSlotIdentifier);
             });
             let routesToAdd: Partial<RouteDetail>[] = [];
+            let iterationError = false;
             await Promise.all(rowPromises).then(directionsResponse => {
                 routesToAdd = directionsResponse.map((dir, index) => {
                     this.logger.verbose(`Route API Response: ${JSON.stringify(dir)}`);
@@ -198,12 +200,10 @@ export class RouteDetailService {
                     }
                 });
             }).catch(err => {
+                iterationError = true;
                 console.log('err', err)
-                this.logger.error(`Error during fetch trance ${iterationIndex}: ${err}`)
+                this.logger.error(`Error during fetch trance ${iterationIndex}`)
             })
-
-            //await wait(60000)
-            await wait(2000)
 
             const insertOperations = this.routeDetailRepository.insert(routesToAdd);
 
@@ -212,6 +212,8 @@ export class RouteDetailService {
                 totalAddedRouteDetail = totalAddedRouteDetail + insertResult.generatedMaps.length;
             })                
             iterationIndex = iterationIndex + 1;
+
+            await wait(Number(process.env.EXTRACTION_TIMEOUT_BETWEEN_CHUNKS))
         }
 
         this.mailService.sendMail(
@@ -222,21 +224,27 @@ export class RouteDetailService {
 
     }
 
-    public async getRouteWithDetailsCsv(fromDate: Date, toDate: Date){
+    public async getRouteDetailsCsvBuffer(){
         // Creazione del workbook
         let data = [
             [
                 'Id arco', 
                 'Id nodo partenza', 
-                'ID nodo arrivo', 
+                'Id nodo arrivo', 
                 'Partenza', 
                 'Arrivo', 
-                'Media distanza 1', 
-                'Media distanza 2',
-                'Media distanza 3',
-                'Tempo 1',
-                'Tempo 2',
-                'Tempo 3',
+                'Distanza 1', 
+                'Distanza 2',
+                'Distanza 3',
+                'Durata 1',
+                'Durata 2',
+                'Durata 3',
+                'Durata medio 1 (senza traffico in tempo reale)',
+                'Durata medio 2 (senza traffico in tempo reale)',
+                'Durata medio 3 (senza traffico in tempo reale)',
+                'Orario estrazione time slot 1',
+                'Orario estrazione time slot 2',
+                'Orario estrazione time slot 3',
             ]
         ];
 
@@ -256,6 +264,12 @@ export class RouteDetailService {
                     routeDetail.durationValue_slot0,
                     routeDetail.durationValue_slot1,
                     routeDetail.durationValue_slot2,
+                    routeDetail.staticDurationValue_slot0,
+                    routeDetail.staticDurationValue_slot1,
+                    routeDetail.staticDurationValue_slot2,
+                    this.getDateFromTimeZone(new Date(routeDetail.date_slot0), 2),
+                    this.getDateFromTimeZone(new Date(routeDetail.date_slot1), 2),
+                    this.getDateFromTimeZone(new Date(routeDetail.date_slot2), 2),
                 ]
             )
         }
@@ -271,23 +285,7 @@ export class RouteDetailService {
 
     }
 
-    private calculateRouteDetailAverage(routeDetail: RouteDetail[]): {[id: number]: {averageDuration: number; averageDistance: number}} {
-        let averages: {[id: number]: {averageDuration: number; averageDistance: number}} = {};
-        for (const key of Object.values(TimeSlotIdentifier)) {
-            if(!isNaN(Number(key))){
-                const routeDetailOfCurrentTimeSlot = routeDetail.filter(routeDetail => routeDetail.timeSlotIdentifier == key)
-                const { totalDistance, totalDuration } = routeDetailOfCurrentTimeSlot.reduce((acc, route) => {
-                    acc.totalDistance += route.distanceValue;
-                    acc.totalDuration += route.durationValue;
-                    return acc;
-                  }, { totalDistance: 0, totalDuration: 0 });
-              
-                const averageDuration = routeDetailOfCurrentTimeSlot.length > 0 ? totalDuration / routeDetailOfCurrentTimeSlot.length : 0;
-                const averageDistance = routeDetailOfCurrentTimeSlot.length > 0 ? totalDistance / routeDetailOfCurrentTimeSlot.length : 0;
-              
-                averages[key] = {averageDuration, averageDistance}
-            }
-        }
-        return averages
+    private getDateFromTimeZone(date: Date, utcHours: number){
+        return new Date (date.setHours(date.getHours() + utcHours)).toLocaleTimeString();
     }
 }

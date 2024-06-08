@@ -26,13 +26,10 @@ import { MailerModule } from '@nestjs-modules/mailer';
     AuthzModule,
     MailerModule.forRoot({
       transport: {
-        //host: process.env.EMAIL_HOST,
-        host: "sandbox.smtp.mailtrap.io",
+        host: process.env.EMAIL_HOST,
         auth: {
-          // user: process.env.EMAIL_USERNAME,
-          // pass: process.env.EMAIL_PASSWORD,
-          user: "29ee18d020fc51",
-          pass: "d03726e73eb7e4"
+          user: process.env.EMAIL_USERNAME,
+          pass: process.env.EMAIL_PASSWORD,
         },
       },
     }),
