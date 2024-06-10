@@ -1,6 +1,6 @@
-import { Controller, Get, Param, Res, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Post, Res, UseGuards } from "@nestjs/common";
 import { Response } from 'express';
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
 import { RouteDetailService } from "src/routes/services/route-detail.service";
 import { v4 as uuid } from 'uuid';
 import { TimeSlotIdentifier } from "src/routes/types/types";
@@ -45,9 +45,26 @@ export class RouteDetailController {
 
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('/routeDetailsCsv')
-    async getRouteDetailsCsv(@Res() res: Response){
-        const buffer = await this.routeDetailService.getRouteDetailsCsvBuffer();
+    @Post('/routeDetailsCsv')
+    @ApiBody({
+        schema: {
+            type: 'array', 
+            items: {
+              type: 'string', 
+              enum: Object.keys(TimeSlotIdentifier),
+            },
+            example: [
+                "SEVEN_TO_NINE_AM", 
+                "NINE_TO_ELEVEN_AM", 
+                "ELEVEN_TO_TWELVE"
+            ]
+        },
+    })
+    async getRouteDetailsCsv(@Res() res: Response, @Body() timeSlotIdentifiers: TimeSlotIdentifier[]){
+        if (!timeSlotIdentifiers.length) {
+            throw new BadRequestException('timeSlotIdentifier array should not be empty');
+        }
+        const buffer = await this.routeDetailService.getRouteDetailsCsvBuffer(timeSlotIdentifiers);
         // Invio del file al client come download
         res.set({
             'Content-Type': 'application/octet-stream',

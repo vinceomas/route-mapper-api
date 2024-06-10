@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { RouteDetail } from "../route-detail/route-detail";
 
 @Entity()
 export class Route {
@@ -29,6 +30,9 @@ export class Route {
 
     @Column()
     public enabled: boolean;
+
+    @OneToMany(() => RouteDetail, routeDetail => routeDetail.route)
+    routeDetails: RouteDetail[];
 
     public constructor(arcId: number, originNodeId: number, destinationNodeId:number, originLatitude: string, originLongitude: string, destinationLatitude: string, destinationLongitude: string){
         this.arcId = arcId;

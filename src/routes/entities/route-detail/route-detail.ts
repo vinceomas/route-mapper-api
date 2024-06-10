@@ -1,13 +1,11 @@
 import { TimeSlotIdentifier } from "src/routes/types/types";
-import { Column, Entity, PrimaryColumn, PrimaryGeneratedColumn, Unique } from "typeorm";
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn, PrimaryGeneratedColumn, Unique } from "typeorm";
+import { Route } from "../route/route";
 
 @Entity()
 export class RouteDetail {
     @PrimaryGeneratedColumn()
     public id: number;
-
-    @Column()
-    public arcId: number;
 
     @Column()
     public jobId: string;
@@ -37,7 +35,15 @@ export class RouteDetail {
     public googleMapsPolyline: string;
 
     @Column()
-    public timeSlotIdentifier: TimeSlotIdentifier
+    public timeSlotIdentifier: TimeSlotIdentifier;
+
+    @ManyToOne(() => Route, route => route.routeDetails)
+    @JoinColumn({ name: "arcId", referencedColumnName: "arcId" })
+    route: Route;
+  
+    @Column()
+    @Index()
+    arcId: number;
 
     public constructor(arcId: number, jobId: string, date: Date, distanceText: string, distanceValue: number, durationText: string, durationValue: number, staticDurationText: string, staticDurationValue: number, googleMapsPolyline: string, timeSlotIdentifier: TimeSlotIdentifier){
         this.arcId = arcId;

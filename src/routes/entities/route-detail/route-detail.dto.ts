@@ -1,4 +1,5 @@
 import { TimeSlotIdentifier } from "src/routes/types/types";
+import { Route } from "../route/route";
 
 export class RouteDetailDto {
     public readonly id: number;
@@ -13,6 +14,7 @@ export class RouteDetailDto {
     public readonly staticDurationValue: number;
     public readonly googleMapsPolyline: string;
     public readonly timeSlotIdentifier: TimeSlotIdentifier;
+    public readonly route: Route;
 
     public constructor(opts?: RouteDetailDto){
         Object.assign(this, opts)

@@ -8,15 +8,15 @@ import { isNullOrUndefined } from "util";
 import { AddRouteDto } from "../entities/route/add-route.dto";
 import { EditRouteDto } from "../entities/route/edit-route.dto";
 import { read, utils } from "xlsx";
-import { CsvRoute, getRouteToAdd as getRouteFromCsvRoute } from "../controllers/route/csv-parser.utils";
-import { ReqBodyDto } from "../controllers/route/route.controller";
+import { CsvRoute, getRouteToAdd as getRouteFromCsvRoute } from "../controllers/route/csv-parser.utils";import { RouteDetail } from "../entities/route-detail/route-detail";
 
 @Injectable()
 export class RouteService {
     public constructor(
         @InjectRepository(Route) private readonly routeRepository: Repository<Route>,
+        @InjectRepository(RouteDetail) private readonly routeDetail: Repository<RouteDetail>,
         private readonly routeMapper: RouteMapperService,
-        private readonly logger: Logger,
+        private readonly logger: Logger
     ){}
 
     public async findAll(): Promise<RouteDto[]>{
@@ -43,7 +43,12 @@ export class RouteService {
     }
 
     public async addMany(routeToAdd: Route[]){
-        return await this.routeRepository.insert(routeToAdd);
+        return await this.routeRepository
+        .createQueryBuilder('route')
+        .insert()
+        .values(routeToAdd)
+        .orIgnore()
+        .execute();
     }    
 
     public async edit(id: number, {originLatitude, originLongitude, destinationLatitude, destinationLongitude, enabled}: EditRouteDto): Promise<RouteDto>{
@@ -73,16 +78,18 @@ export class RouteService {
     }
 
     public async deleteAllRoutes(): Promise<number>{
+        await this.routeDetail.clear();
         const countRouteToDelete = this.routeRepository.count();
-        await this.routeRepository.clear()
+        await this.routeRepository.clear();
         return countRouteToDelete;
     }
 
-    public async extractRoutesFromCsvDataSheet(file: any, body: ReqBodyDto, routeService: RouteService, eraseOldRoutesData: boolean) {
+    public async extractRoutesFromCsvDataSheet(file: any, eraseOldRoutesData: boolean) {
         const logger = new Logger('UploadFileWithInfo');
         if(eraseOldRoutesData){
-            await routeService.deleteAllRoutes().then(deletedRoutes => logger.log(`SONO STATI CANCELLATI ${deletedRoutes} PERCORSI`));        
+            await this.deleteAllRoutes().then(deletedRoutes => logger.log(`SONO STATI CANCELLATI ${deletedRoutes} PERCORSI`)).catch(err => logger.error(`Error during massive routes deletion: ${err}`));        
         }
+        const initialRoutesCount = await this.routeRepository.count();
         const wb = read(file.buffer);
         const csvRoutes: CsvRoute[] = utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
         logger.log(`Numero di righe nel file CSV ${csvRoutes.length}`)
@@ -96,15 +103,19 @@ export class RouteService {
 
         const insertOperations: Promise<InsertResult>[] = routesToAdd.map((routesToAdd, index) => {
             logger.log(`Inserimento della trance: ${index}`)
-            return routeService.addMany(routesToAdd as Route[]);
+            return this.addMany(routesToAdd as Route[]);
         })
 
-        await Promise.all(insertOperations).then(insertOperationResults => {
-            const routesAdded = insertOperationResults.reduce((acc, insertResult) => acc + insertResult.generatedMaps.length, 0)
-            const { originalname, filename: sourceFileName } = file;
-            const { chunkSize = 100 } = body;
-            logger.log(originalname, sourceFileName, chunkSize);
-            logger.log(`PERCORSI AGGIUNTI: ${routesAdded}`)
-        })
+        await Promise.all(insertOperations).then(res => {
+            const insertOperationCount = res.reduce((acc, insertResult) => acc + insertResult.generatedMaps.length, 0);
+            logger.log(`Sono stati eseguiti ${insertOperationCount} tentativi di inserimenti`);
+        });
+        const finalRoutesCount = await this.routeRepository.count();
+        const routesAdded = finalRoutesCount - initialRoutesCount;
+        const discardedRoutes = csvRoutes.length - routesAdded;
+        return {
+            routesAdded,
+            discardedRoutes
+        }
     }
 }

@@ -17,6 +17,7 @@ import { RouteDto } from "../entities/route/route.dto";
 export class RouteDetailService {
     public constructor(
         @InjectRepository(RouteDetail) private readonly routeDetailRepository: Repository<RouteDetail>,
+        @InjectRepository(Route) private readonly routeRepository: Repository<Route>,
         private readonly routeDetailMapper: RouteDetailMapperService,
         private readonly configService: ConfigService,
         private readonly routeService: RouteService,
@@ -50,78 +51,13 @@ export class RouteDetailService {
         return routeDetails.map(this.routeDetailMapper.modelRouteDetailDto);
     }
 
-    private async getAggregatedRoutesDetail() {
+    private async getAggregatedRoutesDetail(timeSlotIdentifiers: number[]) {
+        const result = await this.routeRepository.createQueryBuilder('route')
+        .leftJoinAndSelect('route.routeDetails', 'routeDetail')
+        .where('routeDetail.timeSlotIdentifier IN (:...timeSlotIdentifiers)', { timeSlotIdentifiers })
+        .getMany();
 
-        const subquery0 = this.routeDetailRepository.createQueryBuilder('rDetail0')
-        .select('rDetail0.arcId', 'arcId')
-        .addSelect('0', 'timeSlotIdentifier')
-        .addSelect('MAX(rDetail0.durationValue)', 'max_durationValue0')
-        .where('rDetail0.timeSlotIdentifier = 0')
-        .groupBy('rDetail0.arcId');
-
-        const subquery1 = this.routeDetailRepository.createQueryBuilder('rDetail1')
-        .select('rDetail1.arcId', 'arcId')
-        .addSelect('1', 'timeSlotIdentifier')
-        .addSelect('MAX(rDetail1.durationValue)', 'max_durationValue1')
-        .where('rDetail1.timeSlotIdentifier = 1')
-        .groupBy('rDetail1.arcId');
-
-        const subquery2 = this.routeDetailRepository.createQueryBuilder('rDetail2')
-        .select('rDetail2.arcId', 'arcId')
-        .addSelect('2', 'timeSlotIdentifier')
-        .addSelect('MAX(rDetail2.durationValue)', 'max_durationValue2')
-        .where('rDetail2.timeSlotIdentifier = 2')
-        .groupBy('rDetail2.arcId');
-
-        const results = await this.routeDetailRepository
-        .createQueryBuilder('rDetails')
-        .leftJoin(Route, 'r', 'rDetails.arcId = r.arcId')
-        .leftJoin(
-            `(${subquery0.getQuery()})`,
-            'sq0',
-            'rDetails.arcId = sq0.arcId'
-        )
-        .leftJoin(
-            `(${subquery1.getQuery()})`,
-            'sq1',
-            'rDetails.arcId = sq1.arcId'
-        )
-        .leftJoin(
-            `(${subquery2.getQuery()})`,
-            'sq2',
-            'rDetails.arcId = sq2.arcId'
-        )
-        .select('r.arcId', 'arcId')
-        .addSelect('r.originNodeId', 'originNodeId')
-        .addSelect('r.destinationNodeId', 'destinationNodeId')
-        .addSelect('r.originLatitude', 'originLatitude')
-        .addSelect('r.originLongitude', 'originLongitude')
-        .addSelect('r.destinationLatitude', 'destinationLatitude')
-        .addSelect('r.destinationLongitude', 'destinationLongitude')
-
-        .addSelect('sq0.max_durationValue0', 'durationValue_slot0')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.durationText ELSE NULL END)', 'durationText_slot0')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.distanceValue ELSE NULL END)', 'distanceValue_slot0')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.staticDurationValue ELSE NULL END)', 'staticDurationValue_slot0')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 0 AND rDetails.durationValue = sq0.max_durationValue0 THEN rDetails.date ELSE NULL END)', 'date_slot0')
-
-        .addSelect('sq1.max_durationValue1', 'durationValue_slot1')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.durationText ELSE NULL END)', 'durationText_slot1')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.distanceValue ELSE NULL END)', 'distanceValue_slot1')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.staticDurationValue ELSE NULL END)', 'staticDurationValue_slot1')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 1 AND rDetails.durationValue = sq1.max_durationValue1 THEN rDetails.date ELSE NULL END)', 'date_slot1')
-
-        .addSelect('sq2.max_durationValue2', 'durationValue_slot2')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.durationText ELSE NULL END)', 'durationText_slot2')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.distanceValue ELSE NULL END)', 'distanceValue_slot2')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.staticDurationValue ELSE NULL END)', 'staticDurationValue_slot2')
-        .addSelect('MAX(CASE WHEN rDetails.timeSlotIdentifier = 2 AND rDetails.durationValue = sq2.max_durationValue2 THEN rDetails.date ELSE NULL END)', 'date_slot2')
-
-        .where('rDetails.timeSlotIdentifier IN (0, 1, 2)')
-        .groupBy('rDetails.arcId')
-        .getRawMany();
-    
-        return results;
+        return result;
     }
 
     public async add(routeDetail: Partial<RouteDetail>): Promise<RouteDetail>{
@@ -224,65 +160,67 @@ export class RouteDetailService {
 
     }
 
-    public async getRouteDetailsCsvBuffer(){
-        // Creazione del workbook
-        let data = [
-            [
-                'Id arco', 
-                'Id nodo partenza', 
-                'Id nodo arrivo', 
-                'Partenza', 
-                'Arrivo', 
-                'Distanza 1', 
-                'Distanza 2',
-                'Distanza 3',
-                'Durata 1',
-                'Durata 2',
-                'Durata 3',
-                'Durata medio 1 (senza traffico in tempo reale)',
-                'Durata medio 2 (senza traffico in tempo reale)',
-                'Durata medio 3 (senza traffico in tempo reale)',
-                'Orario estrazione time slot 1',
-                'Orario estrazione time slot 2',
-                'Orario estrazione time slot 3',
-            ]
+    public async getRouteDetailsCsvBuffer(timeSlotIdentifiersKey: TimeSlotIdentifier[]){
+        const timeSlotIdentifiers: number[] = timeSlotIdentifiersKey.map(key => TimeSlotIdentifier[key as unknown as keyof typeof TimeSlotIdentifier]);
+        //CSV header generation
+        let header = [
+            'Id arco', 
+            'Id nodo partenza', 
+            'Id nodo arrivo', 
+            'Partenza', 
+            'Arrivo', 
         ];
+        timeSlotIdentifiers.forEach(identifier => header.push(`Distanza ${identifier}`));
+        timeSlotIdentifiers.forEach(identifier => header.push(`Durata ${identifier}`));
+        timeSlotIdentifiers.forEach(identifier => header.push(`Durata medio ${identifier} (senza traffico in tempo reale)`));
+        timeSlotIdentifiers.forEach(identifier => header.push(`Orario estrazione time slot ${identifier}`));
 
-        const aggregatedRoutesDetail = await this.getAggregatedRoutesDetail();
-        console.log('Route recuperate', aggregatedRoutesDetail.length);
-        for(const routeDetail of aggregatedRoutesDetail){
+        let data = [];
+        data.push(header);
+
+        //CSV row generation
+        const routeWithDetails = await this.getAggregatedRoutesDetail(timeSlotIdentifiers);
+        console.log('Route recuperate', routeWithDetails.length);
+        for(const routeWithDetail of routeWithDetails){
+
+            const routeDetailRow = [];
+            
+            timeSlotIdentifiers.forEach(identifier => {
+                const distanceValue = routeWithDetail.routeDetails.find(rd => rd.timeSlotIdentifier == identifier).distanceValue
+                routeDetailRow.push(distanceValue);
+            })
+            timeSlotIdentifiers.forEach(identifier => {
+                const durationValue = routeWithDetail.routeDetails.find(rd => rd.timeSlotIdentifier == identifier).durationValue
+                routeDetailRow.push(durationValue)
+            })
+            timeSlotIdentifiers.forEach(identifier => {
+                const staticDurationValue = routeWithDetail.routeDetails.find(rd => rd.timeSlotIdentifier == identifier).staticDurationValue
+                routeDetailRow.push(staticDurationValue)
+            })
+            timeSlotIdentifiers.forEach(identifier => {
+                const date = routeWithDetail.routeDetails.find(rd => rd.timeSlotIdentifier == identifier).date
+                routeDetailRow.push(this.getDateFromTimeZone(new Date(date), 0))
+            })
             data.push(
                 [
-                    routeDetail.arcId.toString(), 
-                    routeDetail.originNodeId.toString(),
-                    routeDetail.destinationNodeId.toString(),
-                    `${routeDetail.originLatitude}, ${routeDetail.originLongitude}`, 
-                    `${routeDetail.destinationLatitude}, ${routeDetail.destinationLongitude}`,
-                    routeDetail.distanceValue_slot0,
-                    routeDetail.distanceValue_slot1,
-                    routeDetail.distanceValue_slot2,
-                    routeDetail.durationValue_slot0,
-                    routeDetail.durationValue_slot1,
-                    routeDetail.durationValue_slot2,
-                    routeDetail.staticDurationValue_slot0,
-                    routeDetail.staticDurationValue_slot1,
-                    routeDetail.staticDurationValue_slot2,
-                    this.getDateFromTimeZone(new Date(routeDetail.date_slot0), 2),
-                    this.getDateFromTimeZone(new Date(routeDetail.date_slot1), 2),
-                    this.getDateFromTimeZone(new Date(routeDetail.date_slot2), 2),
+                    routeWithDetail.arcId.toString(), 
+                    routeWithDetail.originNodeId.toString(),
+                    routeWithDetail.destinationNodeId.toString(),
+                    `${routeWithDetail.originLatitude}, ${routeWithDetail.originLongitude}`, 
+                    `${routeWithDetail.destinationLatitude}, ${routeWithDetail.destinationLongitude}`,
+                    ...routeDetailRow
                 ]
             )
         }
 
+        // Workbook generation
         const workbook = utils.book_new();
         const worksheet = utils.aoa_to_sheet(data);        
         utils.book_append_sheet(workbook, worksheet, 'Dati');
 
-        // Conversione del workbook in un buffer
+        // Inserting workbook into buffer
         const buffer = write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
         return buffer;
-
     }
 
     private getDateFromTimeZone(date: Date, utcHours: number){

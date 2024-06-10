@@ -22,7 +22,7 @@ export class ReqBodyDto {
 
     @ApiProperty({ required: true })
     @IsNotEmpty()
-    eraseOldRoutesData: boolean;
+    eraseOldRoutesData: string;
 }
 
 @ApiTags('Routes')
@@ -98,7 +98,9 @@ export class RouteController {
             );
         }
         this.logger.log('FILE VALIDO');
-        return this.routeService.extractRoutesFromCsvDataSheet(file, body, this.routeService, body.eraseOldRoutesData);
+        const eraseOldRoutesData = body.eraseOldRoutesData === 'true';
+        const extractionResult = await this.routeService.extractRoutesFromCsvDataSheet(file, eraseOldRoutesData);
+        return extractionResult;
     }
 
 
