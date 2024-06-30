@@ -1,7 +1,7 @@
-import { Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { CronExpression } from "@nestjs/schedule";
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { CronService } from "src/routes/services/cron.service";
 import { CronExpresionToTimeSlotMap, TimeSlotIdentifier } from "src/routes/types/types";
 
@@ -14,34 +14,45 @@ export class CronJobController{
 
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('/start')
-    async startCronJob(){
-        const cronExpressionToTimeSlotMap: CronExpresionToTimeSlotMap = {
-            [TimeSlotIdentifier.SEVEN_TO_NINE_AM]: CronExpression.EVERY_DAY_AT_7AM,
-            [TimeSlotIdentifier.NINE_TO_ELEVEN_AM]: CronExpression.EVERY_DAY_AT_9AM,
-            [TimeSlotIdentifier.ELEVEN_TO_TWELVE]: CronExpression.EVERY_DAY_AT_NOON
-        }
-        //TODO3: E' importante ritornare il jobID 
-        this.cronService.addCronJob('calculaterouteDetailsInformation', cronExpressionToTimeSlotMap); //only for test run job exery 10 seconds 
-        //this.taskService.addCronJob('calculaterouteDetailsInformation', [CronExpression.EVERY_DAY_AT_7AM, CronExpression.EVERY_DAY_AT_9AM, CronExpression.EVERY_DAY_AT_NOON]);
-        return "added task scheduled every 8 hours"
+    @Post('/start')
+    @ApiBody({
+        schema: {
+            type: 'array', 
+            items: {
+              type: 'string', 
+              enum: Object.keys(TimeSlotIdentifier),
+            },
+            example: [
+                "SEVEN_TO_NINE_AM", 
+                "NINE_TO_ELEVEN_AM", 
+                "ELEVEN_TO_TWELVE"
+            ]
+        },
+    })
+    async startCronJob(@Body() timeSlotIdentifiers: TimeSlotIdentifier[]){
+        return this.cronService.addCronJob('calculaterouteDetailsInformation', timeSlotIdentifiers);
     }
 
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('/stop/:jobName')
-    async stopCronJob(@Param('jobName') jobName: string | undefined){
+    @ApiQuery({ name: 'jobName', required: false })
+    @Delete(':jobName')
+    public stopCronJob(@Query('jobName') jobName: string = undefined){
         if(jobName){
-            this.cronService.stopCronJob(jobName);
+            return this.cronService.stopCronJob(jobName);
         }else{
-            this.cronService.stopAllCronJob();
+            return this.cronService.stopAllCronJob();
         }
     }
 
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('/stopAllCronJobs')
-    async stopAllCronJobs(){
-        this.cronService.stopAllCronJob();
+    @Get('/')
+    async getAll(){
+        const jobNames =  Array.from(this.cronService.getAllCronJob());
+        if(!jobNames.length){
+            return "Nessun cron job trovato";
+        }
+        return jobNames;
     }
 }

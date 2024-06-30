@@ -12,6 +12,7 @@ import { TimeSlotIdentifier } from "../types/types";
 import { MailService } from "./mail.service";
 import { GoogleMapsApiHandler } from "./google-maps-api-handler.service";
 import { RouteDto } from "../entities/route/route.dto";
+import { cronExpressionToTimeSlotMap } from "../cron-job.config";
 
 @Injectable()
 export class RouteDetailService {
@@ -66,17 +67,27 @@ export class RouteDetailService {
         return this.routeDetailMapper.modelRouteDetailDto(currentRouteDetail);
     }
 
-    public async getAllRouteDetails(jobId: string, timeSlotIdentifier: TimeSlotIdentifier){
+    public async getAllRouteDetails(jobId: string, timeSlotIdentifier: TimeSlotIdentifier, checkMaximumTime = true){
+        // Function to check if the current time is within the allowed execution times
+        const isWithinAllowedTime = (timeSlotIdentifier: TimeSlotIdentifier): boolean => {
+            const now = new Date();
+            const nowHours = now.getHours();
+            const nowMinutes = now.getMinutes();
+            return nowHours < cronExpressionToTimeSlotMap[timeSlotIdentifier].maximumTimeForExecution.hours 
+                    || (nowHours === cronExpressionToTimeSlotMap[timeSlotIdentifier].maximumTimeForExecution.hours && nowMinutes < cronExpressionToTimeSlotMap[timeSlotIdentifier].maximumTimeForExecution.minutes) 
+        };
+
+        const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
         let routeMatrix: RouteDto[][] = [];
         let routeMatrixRow: RouteDto[] = [];
         let totalAddedRouteDetail = 0;
+        let routeDetailsErrorCount = 0;
 
         let directionResponseByRouteIdMap: {[id: number]: number} = {}
         const routeDtoArray = await this.routeService.findAllActivedRoutes();
 
-        const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-        //Dividi le route in in chunks
+        //Divide routes into chunks
         for(const routeDto of routeDtoArray){
             routeMatrixRow.push(routeDto);
             if(routeMatrixRow.length > Number(process.env.EXTRACTION_CHUNK_SIZE)){
@@ -89,71 +100,59 @@ export class RouteDetailService {
             routeMatrixRow = [];
         }
 
-        console.log(`Le route sono state divise in ${routeMatrix.length} trance`);
+        this.logger.log(`Le route sono state divise in ${routeMatrix.length} trance`);
 
         let iterationIndex = 0;
         for(const matrixRow of routeMatrix){
-            const rowPromises = matrixRow.map((route, index) => {
-                directionResponseByRouteIdMap[index] = route.arcId;
-                //const routeApiResponse = this.getDirectionsDetail(route, jobId, timeSlotIdentifier)
-                return this.googleMapsApiHandler.getRouteDetails(route);
-                //return this.googleMapsApiHandler.getFakeRouteDetails(route, route.arcId, timeSlotIdentifier);
-            });
-            let routesToAdd: Partial<RouteDetail>[] = [];
-            let iterationError = false;
-            await Promise.all(rowPromises).then(directionsResponse => {
-                routesToAdd = directionsResponse.map((dir, index) => {
-                    this.logger.verbose(`Route API Response: ${JSON.stringify(dir)}`);
-                    // const routeWithLowestTime: DirectionsRoute = dir.data.routes.reduce((acc, cur) => {
-                    //     return cur.legs[0].duration.value < acc.legs[0].duration.value ? cur : acc;
-                    // }, dir.data.routes[0]);
-                    // return {
-                    //     arcId: directionResponseByRouteIdMap[index],
-                    //     jobId: jobId,
-                    //     date: new Date(),
-                    //     distanceText: routeWithLowestTime.legs[0].distance.text,
-                    //     distanceValue: routeWithLowestTime.legs[0].distance.value,
-                    //     durationText: routeWithLowestTime.legs[0].duration.text,
-                    //     durationValue: routeWithLowestTime.legs[0].duration.value,
-                    //     timeSlotIdentifier
-                    // }
-                    if(isNaN(dir[0].routes[0].duration.seconds as number))
-                        this.logger.error(`IsNan duration value for route with arcId: ${directionResponseByRouteIdMap[index]}`)
-                    if(isNaN(dir[0].routes[0].staticDuration.seconds as number))
-                        this.logger.error(`IsNan staticDuration value for route with arcId: ${directionResponseByRouteIdMap[index]}`)
-                    return {
-                        arcId: directionResponseByRouteIdMap[index],
-                        jobId: jobId,
-                        date: new Date(),
-                        distanceText: dir[0].routes[0].localizedValues.distance.text,
-                        distanceValue: dir[0].routes[0].distanceMeters,
-                        durationText: dir[0].routes[0].localizedValues.duration.text,
-                        durationValue:dir[0].routes[0].duration.seconds as number,
-                        staticDurationText: dir[0].routes[0].localizedValues.staticDuration.text,
-                        staticDurationValue: dir[0].routes[0].staticDuration.seconds as number,
-                        googleMapsPolyline: dir[0].routes[0].polyline.encodedPolyline,
-                        timeSlotIdentifier
-                    }
+            if(isWithinAllowedTime(timeSlotIdentifier) || !checkMaximumTime){
+                const rowPromises = matrixRow.map((route, index) => {
+                    directionResponseByRouteIdMap[index] = route.arcId;
+                    return this.googleMapsApiHandler.getRouteDetails(route);
                 });
-            }).catch(err => {
-                iterationError = true;
-                console.log('err', err)
-                this.logger.error(`Error during fetch trance ${iterationIndex}`)
-            })
-
-            const insertOperations = this.routeDetailRepository.insert(routesToAdd);
-
-            await insertOperations.then(insertResult => {
-                console.log(`Inserimento della trance: ${iterationIndex}, sono stati inseriti ${insertResult.generatedMaps.length} elementi`);
-                totalAddedRouteDetail = totalAddedRouteDetail + insertResult.generatedMaps.length;
-            })                
-            iterationIndex = iterationIndex + 1;
-
-            await wait(Number(process.env.EXTRACTION_TIMEOUT_BETWEEN_CHUNKS))
+                let routesToAdd: Partial<RouteDetail>[] = [];
+                await Promise.all(rowPromises).then(directionsResponse => {
+                    routesToAdd = directionsResponse.map((dir, index) => {
+                        this.logger.verbose(`Route API Response: ${JSON.stringify(dir)}`);
+                        if(isNaN(dir[0].routes[0].duration.seconds as number))
+                            this.logger.error(`IsNan duration value for route with arcId: ${directionResponseByRouteIdMap[index]}`)
+                        if(isNaN(dir[0].routes[0].staticDuration.seconds as number))
+                            this.logger.error(`IsNan staticDuration value for route with arcId: ${directionResponseByRouteIdMap[index]}`)
+                        return {
+                            arcId: directionResponseByRouteIdMap[index],
+                            jobId: jobId,
+                            date: new Date(),
+                            distanceText: dir[0].routes[0].localizedValues.distance.text,
+                            distanceValue: dir[0].routes[0].distanceMeters,
+                            durationText: dir[0].routes[0].localizedValues.duration.text,
+                            durationValue:dir[0].routes[0].duration.seconds as number,
+                            staticDurationText: dir[0].routes[0].localizedValues.staticDuration.text,
+                            staticDurationValue: dir[0].routes[0].staticDuration.seconds as number,
+                            googleMapsPolyline: dir[0].routes[0].polyline.encodedPolyline,
+                            timeSlotIdentifier
+                        }
+                    });
+                }).catch(err => {
+                    this.logger.error(`Error during fetch trance ${iterationIndex}`);
+                    routeDetailsErrorCount += routeMatrixRow.length;
+                })
+    
+                const insertOperations = this.routeDetailRepository.insert(routesToAdd);
+    
+                await insertOperations.then(insertResult => {
+                    console.log(`Inserimento della trance: ${iterationIndex}, sono stati inseriti ${insertResult.generatedMaps.length} elementi`);
+                    totalAddedRouteDetail = totalAddedRouteDetail + insertResult.generatedMaps.length;
+                })                
+                iterationIndex = iterationIndex + 1;
+    
+                await wait(Number(process.env.EXTRACTION_TIMEOUT_BETWEEN_CHUNKS))
+            }else{
+                routeDetailsErrorCount += routeMatrixRow.length;
+            }
         }
 
         this.mailService.sendMail(
-            `L'operazione di recupero informazioni sui percorsi è terminata il ${new Date()} sono stati inseriti ${totalAddedRouteDetail} nuovi dettagli con jobId: ${jobId}`,
+            `L'operazione di recupero informazioni sui percorsi è terminata il ${new Date()} sono stati inseriti ${totalAddedRouteDetail} nuovi dettagli con jobId: ${jobId}.` 
+            + (routeDetailsErrorCount > 0) ? `Durante l'estrazione si sono verificati ${routeDetailsErrorCount} errori, si prega di controllare i log.` : ``,
             'OPERAZIONE DI RECUPERO INFO PERCORSI TERMINATA'
         )
         this.logger.log(`PERCORSI AGGIUNTI: ${totalAddedRouteDetail}`)

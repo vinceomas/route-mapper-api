@@ -40,7 +40,7 @@ export class RouteDetailController {
     @Get('/retrieveRouteDetails/:timeSlotIdentifier')
     async retrieveRouteDetails(@Param('timeSlotIdentifier') timeSlotIdentifier: TimeSlotIdentifier){
         const jobUuid: string = uuid();
-        return this.routeDetailService.getAllRouteDetails(jobUuid, timeSlotIdentifier);
+        return this.routeDetailService.getAllRouteDetails(jobUuid, timeSlotIdentifier, true);
     }
 
     @ApiBearerAuth()

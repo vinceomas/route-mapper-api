@@ -125,8 +125,7 @@ export class GoogleMapsApiHandler {
                     lng: Number(route.destinationLongitude)
                 },
                 alternatives: true,
-                //key: this.configService.get<string>('GOOGLE_MAPS_API_KEY'),
-                key: "AIzaSyCa2jbjuPvveaNLvXeOVf0uEPkCw2rb8Lo"
+                key: process.env.GOOGLE_MAPS_API_KEY
             },
             timeout: 3000, // milliseconds
         });

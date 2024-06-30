@@ -1,52 +1,63 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression, SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import { RouteService } from "./route.service";
 import { v4 as uuid } from 'uuid';
 import { MailService } from "./mail.service";
 import { RouteDetailService } from "./route-detail.service";
-import { CronExpresionToTimeSlotMap, TimeSlotIdentifier } from "../types/types";
+import { TimeSlotIdentifier } from "../types/types";
+import {cronExpressionToTimeSlotMap} from "../cron-job.config"
 
 @Injectable()
 export class CronService {
     constructor(
         private schedulerRegistry: SchedulerRegistry,
         private routeDetailService: RouteDetailService,
-        private mailService: MailService
+        private mailService: MailService,
+        private readonly logger: Logger
     ) {}
 
-    //QUESTO è UN JOB DINAMICO CHE PUò ESSERE GENERATO A PARTIRE DA UNA CHIAMATA API 
-    addCronJob(name: string, cronExpresionToTimeSlotMap: CronExpresionToTimeSlotMap) {
+    addCronJob(name: string, timeSlotIdentifiersKey: TimeSlotIdentifier[]) {
+        let cronJobsAdded: string[] = [];
+        let cronJobsDiscarded: string[] = [];
+        const timeSlotIdentifiers: number[] = timeSlotIdentifiersKey.map(key => TimeSlotIdentifier[key as unknown as keyof typeof TimeSlotIdentifier]);
         //Check if there is another cron job with the same name
-        let existJob = false;
-        Object.values(cronExpresionToTimeSlotMap).forEach((cronExpression) => existJob = this.schedulerRegistry.doesExist("cron", `name+${cronExpression.toString()}`)) 
-        if(existJob){                
-            console.warn(
-            `job ${name} già presente, occorre interrompere il job precedente per poterne creare uno nuovo`,
-            );
-        }else{
-            const jobUuid: string = uuid();
-            Object.keys(cronExpresionToTimeSlotMap).forEach(timeSlotIdentifier => {
-                const job = new CronJob(cronExpresionToTimeSlotMap[timeSlotIdentifier], (job) => {
-                    this.routeDetailService.getAllRouteDetails(jobUuid, TimeSlotIdentifier[timeSlotIdentifier]);
+        timeSlotIdentifiers.forEach(identifier => {
+            const cronExpression = cronExpressionToTimeSlotMap[identifier].cronExpression;
+            const currentCronJobName = `${name}+${cronExpression?.toString()}`;
+            const cronJob = this.schedulerRegistry.doesExist("cron", currentCronJobName);
+            if(cronJob){
+                this.logger.log(`job ${name} già presente, occorre interrompere il job precedente per poterne creare uno nuovo`);
+                cronJobsDiscarded.push(currentCronJobName);
+            }else{
+                const jobUuid: string = uuid();
+                const job = new CronJob(cronExpressionToTimeSlotMap[identifier].cronExpression, (job) => {
+                    this.routeDetailService.getAllRouteDetails(jobUuid, identifier);
                     this.mailService.sendMail(
                         `E' stato avviato il job ${name} in data ${new Date()}`,
                         'AVVIO CRON JOB'
                     )
-                    console.warn(`time (${cronExpresionToTimeSlotMap[timeSlotIdentifier]}) for job ${name} to run!`);
+                    this.logger.log(`E' stato avviato il job ${name} in data ${new Date()}`)
                 });
             
-                this.schedulerRegistry.addCronJob(`name+${cronExpresionToTimeSlotMap[timeSlotIdentifier].toString()}`, job);
+                this.schedulerRegistry.addCronJob(currentCronJobName, job);
                 job.start();
+
+                cronJobsAdded.push(currentCronJobName);
+
+                this.mailService.sendMail(
+                    `E' stato aggiunto un nuovo job il ${new Date()} che verrà schedulato nei seguenti orrari: ${JSON.stringify(identifier)}`,
+                    'AGGIUNTA NUOVO CRON JOB'
+                )
             
                 console.warn(
-                `job ${name} added for ${cronExpresionToTimeSlotMap[timeSlotIdentifier]}!`,
+                `job ${name} added for time slot ${identifier}!`,
                 );
-            }); 
-            this.mailService.sendMail(
-                `E' stato aggiunto un nuovo job il ${new Date()} che verrà schedulato nei seguenti orrari: ${JSON.stringify(Object.values(cronExpresionToTimeSlotMap))}`,
-                'AGGIUNTA NUOVO CRON JOB'
-            )
+            }
+        })
+        return {
+            cronJobsAdded,
+            cronJobsDiscarded
         }
     }
 
@@ -55,8 +66,9 @@ export class CronService {
         if(existJob){
             const job = this.schedulerRegistry.getCronJob(name);
             job.stop();
+            this.schedulerRegistry.deleteCronJob(name);
         }else{
-            console.warn(
+            this.logger.warn(
                 `job ${name} not exist!`,
             );
         }
@@ -64,6 +76,14 @@ export class CronService {
 
     stopAllCronJob(){
         const jobs = this.schedulerRegistry.getCronJobs();
-        jobs.forEach(job => job.stop());
+        jobs.forEach((job, key) => {
+            job.stop();
+            this.schedulerRegistry.deleteCronJob(key);
+        });
+    }
+
+    getAllCronJob(){
+        const jobs = this.schedulerRegistry.getCronJobs();
+        return jobs.keys()
     }
 }
