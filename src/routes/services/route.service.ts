@@ -19,9 +19,17 @@ export class RouteService {
         private readonly logger: Logger
     ){}
 
-    public async findAll(): Promise<RouteDto[]>{
-        const routes = await this.routeRepository.find();
-        return routes.map(this.routeMapper.modelRouteDto)
+    public async findAll(page: number, limit: number): Promise<{data: RouteDto[], total: number, page: number, limit: number}>{
+        const [result, total] = await this.routeRepository.findAndCount({
+            skip: (page - 1) * limit,
+            take: limit
+        });
+        return {
+            data: result.map(this.routeMapper.modelRouteDto),
+            total,
+            page,
+            limit
+        }
     }
 
     public async findAllActivedRoutes(): Promise<RouteDto[]>{
@@ -117,5 +125,124 @@ export class RouteService {
             routesAdded,
             discardedRoutes
         }
+    }
+
+    public async checkGraph(): Promise<any>{
+        const routes = await this.routeRepository
+        .createQueryBuilder('entity')
+        .getMany();
+        let readedRouteIds = [];
+        let arcInfo: {nodeId: number, countChildren: number}[] = [];
+        let countSanitizedChildren = 0;
+        routes.forEach(route => {
+            if(!readedRouteIds.find(rr => rr == route.originNodeId)){
+                const childrens = routes.filter(r => r.originNodeId == route.originNodeId);
+                const sanitizedChildrens = this.sanitizeChildrens(childrens);
+                if(sanitizedChildrens.length != childrens.length){
+                    countSanitizedChildren += 1;
+                }
+                arcInfo.push({nodeId: route.originNodeId, countChildren: sanitizedChildrens.length})
+                readedRouteIds.push(route.originNodeId)
+            }
+
+        })
+        let wrongArc: {nodeId: number, countChildren: number}[] = []
+        arcInfo.forEach(arc => {
+            if(arc.countChildren != (arcInfo.length - 1)){
+                wrongArc.push(arc);
+            }
+        })
+
+
+        return {
+            countArc: arcInfo.length,
+            countWrongArc: wrongArc.length, 
+            countSanitizedChildren,
+            wrongArc
+        };
+    }
+
+    private sanitizeChildrens(childrens: Route[]){
+        let sanitizedChildrens: Route[] = [];
+        childrens.forEach(currentChildren => {
+            if(!sanitizedChildrens.find(c => c.originNodeId == currentChildren.originNodeId && c.destinationNodeId == currentChildren.destinationNodeId)){
+                sanitizedChildrens.push(currentChildren)
+            }
+        })
+        return sanitizedChildrens;
+    }
+
+    public async generateLostArc(): Promise<any>{
+        const routes = await this.routeRepository
+        .createQueryBuilder('entity')
+        .getMany();
+
+        let nodes: {nodeId: number, latitude: string, longitude: string}[] = [];
+        routes.forEach(route => {
+            if(!nodes.find(n => n.nodeId == route.destinationNodeId)){
+                nodes.push({
+                    nodeId: route.destinationNodeId,
+                    latitude: route.destinationLatitude,
+                    longitude: route.destinationLongitude
+                });
+            }
+        })
+
+        let currentArcId = 67524; //TODO: check
+        const lostNode = {
+            nodeId: 226,
+            latitude: "41.56552848166146",
+            longitude: "12.867944390257417"
+        }
+        let routesToAddFromOrigin: Route[] = [];
+        let routesToAddFromDestination: Route[] = [];
+
+
+        //use the lost node as the origin
+        nodes.forEach(node => {
+            if(node.nodeId != lostNode.nodeId){
+                currentArcId += 1;
+                const newRoute = new Route(
+                    currentArcId,
+                    lostNode.nodeId,
+                    node.nodeId,
+                    lostNode.latitude,
+                    lostNode.longitude,
+                    node.latitude,
+                    node.longitude
+                )
+                routesToAddFromOrigin.push(newRoute);
+            }
+        })
+
+        //use the lost node as the destination
+        nodes.forEach(node => {
+            if(node.nodeId != lostNode.nodeId){
+                currentArcId += 1;
+                const newRoute = new Route(
+                    currentArcId,
+                    node.nodeId,
+                    lostNode.nodeId,
+                    node.latitude,
+                    node.longitude,
+                    lostNode.latitude,
+                    lostNode.longitude
+                )
+                routesToAddFromDestination.push(newRoute);
+            }
+        })
+
+        let insertOperations = [
+            this.addMany(routesToAddFromOrigin),
+            this.addMany(routesToAddFromDestination)
+        ]
+
+        const insertionResult = await Promise.all(insertOperations)
+
+        return {
+            lostNode: nodes.length,
+            insertedRouteFromOrigin: insertionResult[0].generatedMaps.length,
+            insertedRouteFromDestination: insertionResult[1].generatedMaps.length
+        };
     }
 }

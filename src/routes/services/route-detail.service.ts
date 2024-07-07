@@ -27,9 +27,17 @@ export class RouteDetailService {
         private readonly googleMapsApiHandler: GoogleMapsApiHandler
     ){}
 
-    public async findAll(): Promise<RouteDetailDto[]>{
-        const routeDetails = await this.routeDetailRepository.find();
-        return routeDetails.map(this.routeDetailMapper.modelRouteDetailDto);
+    public async findAll(page: number, limit: number): Promise<{data: RouteDetailDto[], total: number, page: number, limit: number}>{
+        const [result, total] = await this.routeDetailRepository.findAndCount({
+            skip: (page - 1) * limit,
+            take: limit
+        });
+        return {
+            data: result.map(this.routeDetailMapper.modelRouteDetailDto),
+            total,
+            page,
+            limit
+        }
     }
 
     public async findByJobId(jobId: string): Promise<RouteDetailDto[]>{

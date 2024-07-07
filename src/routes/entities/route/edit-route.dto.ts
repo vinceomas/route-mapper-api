@@ -1,36 +1,45 @@
-import { IsBoolean, IsNotEmpty, IsString } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
+import { IsBoolean, IsInt, IsNotEmpty, IsString } from "class-validator";
 
 export class EditRouteDto{
 
-    @IsString()
+    @IsInt()
     @IsNotEmpty()
+    @ApiProperty({ description: 'Arc id' })
     public readonly arcId: number;
 
-    @IsString()
+    @IsInt()
     @IsNotEmpty()
+    @ApiProperty({ description: 'Origin Node Id' })
     public readonly originNodeId: number;
 
-    @IsString()
+    @IsInt()
     @IsNotEmpty()
+    @ApiProperty({ description: 'Destination Node Id' })
     public readonly destinationNodeId: number;
 
     @IsString()
     @IsNotEmpty()
+    @ApiProperty({ description: 'Origin node latitude' })
     public readonly originLongitude: string;
 
     @IsString()
     @IsNotEmpty()
+    @ApiProperty({ description: 'origin node longitude' })
     public readonly originLatitude: string;
 
     @IsString()
     @IsNotEmpty()
+    @ApiProperty({ description: 'destination node longitude' })
     public readonly destinationLongitude: string;
 
     @IsString()
     @IsNotEmpty()
+    @ApiProperty({ description: 'destination node latitude' })
     public readonly destinationLatitude: string;
 
     @IsBoolean()
+    @ApiProperty({ description: 'Arc enabled for data extraction' })
     public readonly enabled: boolean;
 
     public constructor(opts?: Partial<EditRouteDto>){

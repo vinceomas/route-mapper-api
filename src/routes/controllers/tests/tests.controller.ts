@@ -32,4 +32,16 @@ export class TestController {
     async delete(@Body() ids: number[]){
         return this.testService.deleteRouteDetails(ids);
     }
+
+    @Get("/checkGraph")
+    async checkGraph(){
+        return this.routeService.checkGraph();
+    }
+
+    @Get("/generateLostArc")
+    async generateLostArc(){
+        return this.routeService.generateLostArc();
+    }
+
+
 }

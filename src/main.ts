@@ -16,9 +16,8 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
   .setTitle('Route Mapper API')
-  .setDescription('Route Mapper API')
+  .setDescription('Tools to extract route information and build a graph of a real road network')
   .setVersion('1.0')
-  .addTag('routeMapper')
   .addBearerAuth()
   .build();
   const document = SwaggerModule.createDocument(app, config);

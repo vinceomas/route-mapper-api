@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, HttpException, Logger, Param, Post, Put, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpException, Logger, Param, Post, Put, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiProperty, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiProperty, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { IsNotEmpty } from 'class-validator';
 import { AddRouteDto } from 'src/routes/entities/route/add-route.dto';
 import { EditRouteDto } from 'src/routes/entities/route/edit-route.dto';
@@ -10,6 +10,7 @@ import { RouteService } from 'src/routes/services/route.service';
 import { CronService } from 'src/routes/services/cron.service';
 import { SUPPORTED_FILES, multerOptions } from './csv-parser.utils';
 import { JwtAuthGuard } from 'src/authz/jwt.guard';
+import { PaginationDto } from 'src/routes/entities/route/pagination.dto';
 
 export class ReqBodyDto {
     @ApiProperty({ required: true })
@@ -40,8 +41,12 @@ export class RouteController {
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
     @Get()
-    public findAll(): Promise<RouteDto[]>{
-        return this.routeService.findAll();
+    @ApiBody({ type: PaginationDto })
+    @ApiQuery({ name: 'page', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    public findAll(@Query() paginationDto: PaginationDto): Promise<{data: RouteDto[], total: number, page: number, limit: number}>{
+        const { page = 1, limit = 10 } = paginationDto;
+        return this.routeService.findAll(page, limit);
     }
     
     @ApiBearerAuth()

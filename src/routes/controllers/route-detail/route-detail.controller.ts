@@ -1,10 +1,11 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Res, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Res, UseGuards } from "@nestjs/common";
 import { Response } from 'express';
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { RouteDetailService } from "src/routes/services/route-detail.service";
 import { v4 as uuid } from 'uuid';
 import { TimeSlotIdentifier } from "src/routes/types/types";
 import { AuthGuard } from "@nestjs/passport";
+import { PaginationDto } from "src/routes/entities/route/pagination.dto";
 
 @ApiTags('Route Details')
 @Controller('routeDetail')
@@ -16,28 +17,31 @@ export class RouteDetailController {
 
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('/finAllrouteDetails')
-    async findAllrouteDetails(){
-        return this.routeDetailService.findAll();
+    @Get('/')
+    @ApiQuery({ name: 'page', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    async findAllrouteDetails(@Query() paginationDto: PaginationDto){
+        const { page = 1, limit = 10 } = paginationDto;
+        return this.routeDetailService.findAll(page, limit);
     }
 
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('/findAllrouteDetails/:arcId')
+    @Get('/:arcId')
     async findAllrouteDetailsByArcId(@Param('arcId') arcId: number){
         return this.routeDetailService.findByArcId(arcId)
     }
 
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('/findAllrouteDetails/:jobId')
+    @Get('/:jobId')
     async findAllrouteDetailsByJobId(@Param('jobId') jobId: string){
         return this.routeDetailService.findByJobId(jobId)
     }    
 
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('/retrieveRouteDetails/:timeSlotIdentifier')
+    @Get('/:timeSlotIdentifier')
     async retrieveRouteDetails(@Param('timeSlotIdentifier') timeSlotIdentifier: TimeSlotIdentifier){
         const jobUuid: string = uuid();
         return this.routeDetailService.getAllRouteDetails(jobUuid, timeSlotIdentifier, true);
