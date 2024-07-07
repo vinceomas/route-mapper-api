@@ -51,7 +51,7 @@ export class CronJobController{
     async getAll(){
         const jobNames =  Array.from(this.cronService.getAllCronJob());
         if(!jobNames.length){
-            return "Nessun cron job trovato";
+            return "No cron jobs found";
         }
         return jobNames;
     }

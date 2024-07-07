@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpException, Logger, Param, Post, Put, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiProperty, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOkResponse, ApiProperty, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { IsNotEmpty } from 'class-validator';
 import { AddRouteDto } from 'src/routes/entities/route/add-route.dto';
 import { EditRouteDto } from 'src/routes/entities/route/edit-route.dto';
@@ -51,6 +51,7 @@ export class RouteController {
     
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
+    @ApiOkResponse({type: [RouteDto]})
     @Get(':id')
     public findOne(@Param('id') id: number): Promise<RouteDto>{
         return this.routeService.findOne(id);
